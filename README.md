@@ -27,6 +27,14 @@ Vertical slice jogável de um roguelite 2D top-down em pixel art dark fantasy: *
 - Baú de uso único: +6 de dano, +12 XP e até 35 de cura. O selo lunar encerra a partida após o baú.
 - Sprites animados, iluminação ciano, HUD temática, minimapa e efeitos em pixel art.
 
+## Polimento visual
+
+A visão interna é **384×216**, ampliada em **3×** na janela padrão de 1152×648, com filtro nearest e câmera que segue Kael em posições de pixel inteiro. Os limites da câmera ficam dentro da masmorra. O campo de visão continua utilizável para combate, com indicadores nas bordas para arqueiros fora da tela.
+
+Kael agora usa cabelo prateado, capa azul, armadura com reflexos e espada clara. Os personagens possuem frames de 32×32 px e seis frames por estado. Pisos com juntas discretas, paredes com profundidade, estátuas, pilares altos, cristais e um selo lunar central reforçam a catacumba sem ocupar as rotas de combate com novas colisões.
+
+A HUD ficou compacta; vida, XP, nível, corrupção reservada e recarga do dash continuam visíveis. Projéteis aliados usam rastro ciano, enquanto inimigos usam um losango quente com borda roxa. Impactos, números de dano, morte e afterimages do dash são somente feedback visual. Luzes compartilham textura; efeitos temporários possuem limite de 64 instâncias e as partículas ambientais são limitadas a 32.
+
 Os PNGs originais em `assets/` já estão incluídos. O jogo não requer downloads nem execução do gerador de arte. Veja `assets/README.md` e `DEVELOPMENT_PROGRESS.md` para os placeholders e detalhes técnicos.
 
 ## Verificação e manutenção

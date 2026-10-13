@@ -7,6 +7,7 @@ const ExperienceOrb = preload("res://experience_orb.gd")
 const Dungeon = preload("res://dungeon.gd")
 const HUD = preload("res://hud.gd")
 const Effect = preload("res://effects.gd")
+const PixelCamera = preload("res://pixel_camera.gd")
 
 var player: Player
 var dungeon: Dungeon
@@ -22,7 +23,7 @@ var notice_timer: float = 5.0
 var ending_text: String = ""
 var chest: Sprite2D
 var portal: Sprite2D
-var camera: Camera2D
+var camera: PixelCamera
 
 func _ready() -> void:
 	_ensure_input_map()
@@ -36,14 +37,9 @@ func _ready() -> void:
 	player.died.connect(_on_player_died)
 	player.leveled_up.connect(_on_player_leveled_up)
 	dungeon.actors.add_child(player)
-	camera = Camera2D.new()
-	camera.position_smoothing_enabled = true
-	camera.position_smoothing_speed = 7.0
-	camera.limit_left = 0
-	camera.limit_top = -8
-	camera.limit_right = 1120
-	camera.limit_bottom = 604
-	player.add_child(camera)
+	camera = PixelCamera.new()
+	camera.target = player
+	add_child(camera)
 	chest = _prop(Dungeon.CHEST, 0)
 	portal = _prop(Dungeon.EXIT, 2)
 	var canvas: CanvasLayer = CanvasLayer.new()
@@ -59,7 +55,7 @@ func _process(delta: float) -> void:
 	if not combat_started and player.position.x > 488.0 and Dungeon.COMBAT.has_point(player.position):
 		combat_started = true
 		dungeon.set_gate(0, true)
-		effect(dungeon.gate_positions[0], Color("bd627e"))
+		effect(dungeon.gate_positions[0], Color("bd627e"), "gate")
 		_start_wave()
 	if wave_timer >= 0.0:
 		wave_timer -= delta
@@ -104,11 +100,31 @@ func spawn_experience(at: Vector2, amount: int) -> void:
 	add_child(orb)
 
 func effect(at: Vector2, ink: Color, kind: String = "impact", direction: Vector2 = Vector2.RIGHT) -> void:
+	if get_tree().get_nodes_in_group("visual_effects").size() >= 64: return
 	var visual: Effect = Effect.new()
 	visual.position = at
 	visual.ink = ink
 	visual.kind = kind
 	visual.direction = direction
+	add_child(visual)
+
+func dash_echo(at: Vector2, texture: Texture2D, flipped: bool, direction: Vector2) -> void:
+	if get_tree().get_nodes_in_group("visual_effects").size() >= 64: return
+	var visual: Effect = Effect.new()
+	visual.position = at
+	visual.kind = "dash"
+	visual.ghost = texture
+	visual.flipped = flipped
+	visual.direction = direction
+	add_child(visual)
+
+func damage_number(at: Vector2, amount: float, player_hit: bool = false) -> void:
+	if get_tree().get_nodes_in_group("visual_effects").size() >= 64: return
+	var visual: Effect = Effect.new()
+	visual.position = at
+	visual.kind = "number"
+	visual.caption = str(int(amount))
+	visual.ink = Color("ff947f") if player_hit else Color("e8c48b")
 	add_child(visual)
 
 func _on_enemy_died(enemy: Node2D, experience: int) -> void:
@@ -124,14 +140,14 @@ func _on_enemy_died(enemy: Node2D, experience: int) -> void:
 		dungeon.set_gate(0, false)
 		dungeon.set_gate(1, false)
 		portal.region_rect.position.x = 72
-		for at in dungeon.gate_positions: effect(at, Color("65dddb"))
+		for at in dungeon.gate_positions: effect(at, Color("65dddb"), "gate")
 		_message("CÂMARA PURIFICADA  ·  o relicário está aberto", 5.0)
 
 func _on_experience_collected(amount: int) -> void:
 	if not game_finished: player.gain_experience(amount)
 
 func _on_player_leveled_up(level: int) -> void:
-	effect(player.position, Color("c4a66b"))
+	effect(player.position, Color("c4a66b"), "collect")
 	_message("ASCENSÃO %d  ·  vida e dano aumentados" % level, 2.0)
 
 func _on_player_died() -> void:
@@ -146,7 +162,7 @@ func _interact() -> void:
 		player.gain_experience(12)
 		player.health = minf(player.max_health, player.health + 35.0)
 		player.health_changed.emit(player.health, player.max_health)
-		effect(Dungeon.CHEST, Color("c4a66b"))
+		effect(Dungeon.CHEST, Color("c4a66b"), "collect")
 		_message("RELÍQUIA LUNAR  ·  +6 dano  ·  +12 ecos  ·  cura", 5.0)
 	elif chest_open and player.position.distance_to(Dungeon.EXIT) < 32.0:
 		game_finished = true

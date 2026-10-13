@@ -16,8 +16,8 @@ config/features=PackedStringArray("4.3", "GL Compatibility")
 
 [display]
 
-window/size/viewport_width=576
-window/size/viewport_height=324
+window/size/viewport_width=384
+window/size/viewport_height=216
 window/size/window_width_override=1152
 window/size/window_height_override=648
 window/stretch/mode="viewport"
@@ -29,6 +29,7 @@ theme/default_font_multichannel_signed_distance_field=false
 
 [rendering]
 
+2d/snap/snap_2d_transforms_to_pixel=true
 textures/canvas_textures/default_texture_filter=0
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"

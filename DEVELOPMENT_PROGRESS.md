@@ -1,5 +1,33 @@
 # ECLIPSE — Progresso de desenvolvimento
 
+## Polimento visual e experiência (13/10/2026)
+
+Etapa aplicada à vertical slice existente, mantendo dano, velocidades, hitboxes, três ondas, navegação, XP, recompensa do baú e condições de vitória/derrota.
+
+- Câmera suave, posição renderizada em pixels inteiros e limites verificados nas quatro extremidades do mapa. Visão interna 384×216, janela 1152×648 com escala inteira 3×. Indicadores direcionais alertam sobre arqueiros fora da área visível.
+- Kael e inimigos ganharam sheets de 192×192 (frames 32×32, seis por estado). Kael tem cabelo prateado, capa azul com movimento, armadura em camadas e espada clara. Ataque reinicia a pose por golpe; cadências visuais ajustadas sem alterar o cooldown.
+- Rastejante baixo com patas, arqueiro de capuz lilás e guardião com ombros largos/fissuras ciano. Efeitos distintos de impacto, flashes, morte e números flutuantes de dano.
+- Atlas expandido para 64 posições: lajes variadas, juntas de baixo contraste, rachaduras, musgo e selo lunar central. Seleção por mistura determinística das coordenadas reduz padrões diagonais repetidos.
+- Paredes com topo, face e sombra de contato; região não transitável mais escura. Pilares altos, sarcófagos e personagens compartilham a ordenação pelos pés. Estátuas, cristais, velas, raízes e altar aparecem nas bordas, preservando as rotas e colisões da slice.
+- Tochas/ciano, cristais/roxo e runas com luz localizada, chama/brilho oscilantes e pequena luz acompanhando Kael. Textura de luz compartilhada, sombras simples e 32 partículas ambientais discretas.
+- HUD compacta: barras de vida/XP, nível, corrupção reservada, sala, onda/inimigos, minimapa e slots. Barra de vida com perda atrasada e indicador de recarga do dash. Minimap pré-renderizado em textura para evitar redesenhar centenas de células por frame.
+- Afterimages do dash, partículas de golpe, cruz de impacto, fragmentos de morte e coleta ascendente. Projéteis aliados têm rastro ciano/lâmina; os hostis são losangos quentes com borda roxa. Efeitos temporários limitados a 64 e liberados após sua duração.
+- Grades com bordas de pedra, barras metálicas, lacre lunar e estado aberto mais legível; preservada a animação e a colisão anterior.
+
+### Arquivos deste polimento
+
+Criados: `pixel_camera.gd`, `atmosphere.gd`, `assets/environment.png` e seus metadados/UIDs.
+
+Modificados: `main.gd`, `dungeon.gd`, `hud.gd`, `pixel_actor.gd`, `player.gd`, `enemy.gd`, `projectile.gd`, `experience_orb.gd`, `effects.gd`, `gate.gd`, `project.godot`, `tools/build_art.gd`, `tests/smoke_test.gd`, `tests/capture.gd`, `README.md`, `assets/README.md`, este documento e os PNGs originais de tiles/personagens/props. A cena principal e a configuração das ondas/recompensas foram preservadas.
+
+### Limitações ainda presentes
+
+Arte e animações continuam provisórias e geradas localmente; não possuem oito direções desenhadas nem variações de equipamentos. Fonte padrão da Godot. Corrupção/inventário permanecem reservados. Layout fixo, sem áudio, chefe ou save. As sombras são de contato, sem oclusão dinâmica complexa das luzes.
+
+### Validação efetivamente realizada
+
+Godot **4.7.2**, importação do editor headless sem erros de script, regressão de **36 verificações com zero falhas** (30 sistemas existentes + enquadramento/limites/seguimento da câmera, textura de luz compartilhada e limite/liberação de efeitos). Capturas reais com OpenGL Compatibility inspecionadas: vestíbulo, câmara, relicário e feedback de ataque/dash/projéteis. Essas capturas verificam aparência na engine; não equivalem a uma rodada manual completa nem a um benchmark de desempenho.
+
 ## Vertical slice — Catacumbas do Eclipse (13/10/2026)
 
 Implementada sobre os sistemas da base inicial. A progressão agora ocorre por exploração contínua de quatro espaços e três ondas na câmara, sem teleportar Kael entre arenas.

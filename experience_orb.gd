@@ -24,7 +24,7 @@ func _physics_process(delta: float) -> void:
 		global_position = global_position.move_toward(target.global_position, 165.0 * delta)
 	if distance < pickup_radius:
 		collected.emit(amount)
-		game.effect(target.position, Color("65dddb"))
+		game.effect(target.position, Color("65dddb"), "collect")
 		queue_free()
 	queue_redraw()
 

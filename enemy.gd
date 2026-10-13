@@ -82,12 +82,13 @@ func take_damage(amount: float) -> void:
 	if dying or game.game_finished: return
 	health -= amount
 	hit_flash = 0.13
-	game.effect(position, Color("65dddb"))
+	game.effect(position, Color("b7f6ee"), "impact")
+	game.damage_number(position, amount)
 	if health <= 0.0:
 		dying = true
 		remove_from_group("enemies")
 		visual.show_state("death", Vector2.RIGHT)
-		game.effect(position, Color("927aa9"))
+		game.effect(position, Color("b995d0"), "death")
 		died.emit(self, experience_value)
 		var tween: Tween = create_tween()
 		tween.tween_property(self, "modulate:a", 0.0, 0.4)
@@ -96,5 +97,5 @@ func take_damage(amount: float) -> void:
 
 func _draw() -> void:
 	if health < max_health and not dying:
-		draw_rect(Rect2(-9, -23, 18, 2), Color("162032"))
-		draw_rect(Rect2(-9, -23, maxf(0, 18 * health / max_health), 2), Color("bd627e"))
+		draw_rect(Rect2(-10, -31, 20, 3), Color("080e19"))
+		draw_rect(Rect2(-9, -30, maxf(0, 18 * health / max_health), 1), Color("ff947f"))

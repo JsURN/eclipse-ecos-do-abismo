@@ -22,6 +22,28 @@ func _run() -> void:
 	root.add_child(game)
 	current_scene = game
 	await _frames(5)
+	var view_size: Vector2 = game.camera.get_viewport_rect().size / game.camera.zoom
+	_check(view_size.x >= 384 and view_size.y >= 216, "Closer camera retains a useful combat field")
+	var camera_contained: bool = true
+	for edge in [Vector2(32,112), Vector2(1072,112), Vector2(32,480), Vector2(1072,480)]:
+		game.player.position = edge
+		game.camera.snap_to_target()
+		var visible: Rect2 = Rect2(game.camera.get_screen_center_position() - view_size / 2, view_size)
+		camera_contained = camera_contained and game.camera.world_bounds.encloses(visible)
+	_check(camera_contained, "Camera shows no area beyond dungeon bounds at all four edges")
+	game.player.position = game.Dungeon.START
+	game.camera.snap_to_target()
+	var camera_before: Vector2 = game.camera.position
+	game.player.position += Vector2(120, 0)
+	await _frames(24)
+	_check(game.camera.position.x > camera_before.x and game.camera.position == game.camera.position.round(), "Camera follows smoothly at integer pixel positions")
+	game.player.position = game.Dungeon.START
+	game.camera.snap_to_target()
+	_check(game.dungeon.torches[0].texture == game.dungeon.torches[1].texture, "Localized lights share one cached texture")
+	for i in range(80): game.effect(game.player.position, Color.WHITE)
+	_check(get_nodes_in_group("visual_effects").size() <= 64, "Transient visual effects are capped")
+	await _frames(45)
+	_check(get_nodes_in_group("visual_effects").is_empty(), "Visual bursts expire and free themselves")
 	_check(game.dungeon.ground is TileMapLayer, "Dungeon uses TileMapLayer")
 	_check(game.player.visual.sprite_frames.get_animation_names().size() == 6, "Kael has six animations")
 	_check(game.dungeon.navigation.get_point_path(Vector2i(10, 19), Vector2i(38, 18)).size() > 0, "Start and combat chamber are connected")

@@ -38,6 +38,13 @@ func _ready() -> void:
 	visual = PixelActor.new()
 	visual.configure(preload("res://assets/kael.png"))
 	add_child(visual)
+	var light: PointLight2D = PointLight2D.new()
+	light.texture = game.dungeon._glow_texture()
+	light.texture_scale = 1.5
+	light.position = Vector2(0, -10)
+	light.color = Color("b8cde8")
+	light.energy = 0.55
+	add_child(light)
 
 func _physics_process(delta: float) -> void:
 	if health <= 0.0 or game.game_finished:
@@ -61,7 +68,8 @@ func _physics_process(delta: float) -> void:
 		trail_timer -= delta
 		if trail_timer <= 0.0:
 			trail_timer = 0.045
-			game.effect(position, Color("65dddb"), "dash")
+			var texture: Texture2D = visual.sprite_frames.get_frame_texture(visual.animation, visual.frame)
+			game.dash_echo(position, texture, visual.flip_h, dash_direction)
 	move_and_slide()
 	if Input.is_action_pressed("attack") and attack_cooldown <= 0.0:
 		attack()
@@ -80,6 +88,7 @@ func attack() -> void:
 	if mouse_direction.length_squared() > 16.0:
 		aim = mouse_direction.normalized()
 	last_direction = aim
+	visual.restart_attack(aim)
 	game.spawn_projectile(global_position + aim * 8.0, aim, attack_damage)
 	game.effect(global_position + aim * 8.0, Color("b7f6ee"), "attack", aim)
 
@@ -89,7 +98,8 @@ func take_damage(amount: float) -> void:
 	invulnerability = 0.55
 	health = maxf(0.0, health - amount)
 	health_changed.emit(health, max_health)
-	game.effect(position, Color("bd627e"))
+	game.effect(position, Color("ff947f"), "hurt")
+	game.damage_number(position, amount, true)
 	if health <= 0.0:
 		visual.show_state("death", last_direction)
 		died.emit()
