@@ -49,10 +49,8 @@ func _draw() -> void:
 		var at: Vector2 = (trail[i] - position).round()
 		draw_rect(Rect2(at - Vector2.ONE, Vector2(2, 2)), Color(ink, (1.0 - float(i) / 5.0) * 0.35))
 	if hostile:
-		# Warm diamond and violet rim remain distinct even without color alone.
-		draw_colored_polygon(PackedVector2Array([Vector2(0,-5), Vector2(5,0), Vector2(0,5), Vector2(-5,0)]), Color("735585"))
-		draw_colored_polygon(PackedVector2Array([Vector2(0,-3), Vector2(3,0), Vector2(0,3), Vector2(-3,0)]), ink)
-		draw_rect(Rect2(-1, -1, 2, 2), Color("fff0cf"))
+		draw_set_transform(Vector2.ZERO,direction.angle())
+		draw_texture_rect(preload("res://assets/effects/spectral_projectile.png"),Rect2(-36,-16,48,32),false,Color(1.1,0.95,1.0))
 	else:
 		draw_line(-direction * 9, direction * 3, Color("285779"), 3)
 		draw_line(-direction * 5, direction * 3, ink, 1)

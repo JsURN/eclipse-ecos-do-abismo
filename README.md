@@ -29,13 +29,13 @@ Vertical slice jogável de um roguelite 2D top-down em pixel art dark fantasy: *
 
 ## Polimento visual
 
-A visão interna é **384×216**, ampliada em **3×** na janela padrão de 1152×648, com filtro nearest e câmera que segue Kael em posições de pixel inteiro. Os limites da câmera ficam dentro da masmorra. O campo de visão continua utilizável para combate, com indicadores nas bordas para arqueiros fora da tela.
+A integração das folhas conceituais mantém um campo de **384×216 unidades do mundo**, agora com viewport de **768×432**, zoom inteiro 2× e janela padrão 1536×864 em escala inteira 2×. Isso preserva detalhe dos recortes sem mudar a física. Filtro nearest, pivô nos pés, limites da câmera e indicadores de arqueiros fora da tela continuam ativos.
 
-Kael agora usa cabelo prateado, capa azul, armadura com reflexos e espada clara. Os personagens possuem frames de 32×32 px e seis frames por estado. Pisos com juntas discretas, paredes com profundidade, estátuas, pilares altos, cristais e um selo lunar central reforçam a catacumba sem ocupar as rotas de combate com novas colisões.
+Kael, criaturas, pisos, paredes, portas, objetos e efeitos usam os recortes dos três anexos, organizados nas subpastas de `assets/`. Cada estado usa somente os frames mapeados no manifest; idle é uma pose, e algumas sequências têm apenas dois quadros válidos. Detalhes e correções manuais estão em `assets/INTEGRATION_REPORT.md`.
 
-A HUD ficou compacta; vida, XP, nível, corrupção reservada e recarga do dash continuam visíveis. Projéteis aliados usam rastro ciano, enquanto inimigos usam um losango quente com borda roxa. Impactos, números de dano, morte e afterimages do dash são somente feedback visual. Luzes compartilham textura; efeitos temporários possuem limite de 64 instâncias e as partículas ambientais são limitadas a 32.
+A HUD ficou compacta; vida, XP, nível, corrupção reservada e recarga do dash continuam visíveis. Projéteis aliados usam rastro ciano; inimigos usam a flecha espectral roxa extraída da referência. Impactos, números de dano, morte e afterimages do dash são somente feedback visual. Luzes compartilham textura; efeitos temporários possuem limite de 64 instâncias e as partículas ambientais são limitadas a 32.
 
-Os PNGs originais em `assets/` já estão incluídos. O jogo não requer downloads nem execução do gerador de arte. Veja `assets/README.md` e `DEVELOPMENT_PROGRESS.md` para os placeholders e detalhes técnicos.
+Os PNGs preparados e o TileSet editável já estão incluídos. O jogo não requer downloads nem execução dos preparadores. Os gráficos simplificados antigos foram preservados como legado.
 
 ## Verificação e manutenção
 
@@ -46,11 +46,12 @@ godot --headless --path . --editor --quit
 godot --headless --path . --script tests/smoke_test.gd
 ```
 
-Para regenerar a arte original e reimportá-la:
+Para refazer os recortes das fontes preservadas e reimportá-los:
 
 ```text
-godot --headless --path . --script tools/build_art.gd
+godot --headless --path . --script tools/prepare_concept_assets.gd
 godot --headless --path . --editor --quit
+godot --headless --path . --script tools/build_concept_tileset.gd
 ```
 
 `tests/capture.gd` usa renderização gráfica e salva capturas em `artifacts/`, ignorado pelo Git. O teste de integração usa a engine, física e cena reais; algumas etapas forçam dano/posições para percorrer todos os estados sem depender da habilidade de um jogador.

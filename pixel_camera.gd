@@ -5,6 +5,7 @@ var world_bounds: Rect2 = Rect2(32, 112, 1040, 368)
 var follow_position: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
+	zoom = Vector2(2,2)
 	position_smoothing_enabled = false
 	limit_left = int(world_bounds.position.x)
 	limit_top = int(world_bounds.position.y)

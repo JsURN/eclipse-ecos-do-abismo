@@ -1,5 +1,49 @@
 # ECLIPSE — Progresso de desenvolvimento
 
+## Integração dos novos assets conceituais (13/10/2026)
+
+Os três anexos estavam acessíveis. Foram inspecionados antes das alterações no jogo: Kael e inimigos 1448×1086; cenário 1672×941, todos RGBA com transparência real e muito alpha parcial. Os originais estão copiados sem alteração em `assets/source_art/`. O preto da visualização não foi removido por chroma key.
+
+### Implementado e integrado
+
+- 48 frames válidos mapeados por recorte/pivô individual, sem presumir grade uniforme ou regenerar as imagens: 20 de Kael, 11 do rastejante, 8 do arqueiro e 9 do guardião. `concept_manifest.json` registra exatamente as sequências carregadas.
+- `AnimatedSprite2D`/`SpriteFrames` com pivô nos pés. Kael: pose idle frontal/costas, walk com dois frames por vista, ataque de três frames, dash de três, hurt de dois e death de seis. Os inimigos usam idle, walk, ataque, hurt e morte disponíveis; idle e alguns hurt são poses únicas, não ciclos inventados.
+- Poses de ataque ligadas a liberação de projétil/contato da IA. Impactos ligados ao dano real. Cadências, vida, hitboxes, velocidades, XP, ondas e recompensas preservados.
+- TileSet editável `assets/tilesets/catacombs/catacombs.tres`, atlas recortado de 256×256 e duas TileMapLayer por células. Piso, fissuras, musgo, faces/cantos adaptados, corredor e selo lunar. Colisões das paredes e bases mantidas.
+- Portas abertas/fechadas da nova folha ligadas aos corpos físicos e à transição existente. Baú fechado/aberto, recompensa e saída lunar continuam funcionais.
+- Pilares, estátuas, sarcófagos, tochas, runas, pedestal/cristal, ossos, raízes, entulho e corrupção usam os novos recortes. Y-sort pelos pés, sombras simples e iluminação localizada mais clara.
+- Arco, brilho de impacto, corrupção e flecha espectral extraídos das folhas; partículas/afterimages/números existentes complementam os efeitos. Retrato de Kael na HUD também foi extraído.
+- Resolução 768×432, zoom inteiro 2× e janela padrão 1536×864 em escala inteira 2×. Campo do mundo permanece 384×216. Arte/camadas em escala 0,5 combinada ao zoom 2× resulta em pixels nativos nítidos, sem mudar dimensões físicas nem distorcer proporções dos personagens.
+- Foco na câmara de combate completa com três ondas, portas e obstáculos; os outros espaços existentes usam o atlas preparado e continuam conectados. Não foram adicionadas masmorras/sistemas novos.
+
+### Arquivos criados
+
+- `concept_art.gd`: carregamento/cache dos SpriteFrames definidos pelo manifest.
+- `tools/prepare_concept_assets.gd`: mapa de recortes, normalização/pivôs e extração offline reproduzível.
+- `tools/build_concept_tileset.gd`: salva o TileSet com colisões editáveis.
+- `assets/source_art/`: três fontes preservadas, `.gdignore` e candidatos rejeitados recuperáveis em `rejected_crops/`.
+- `assets/characters/kael/`, `assets/enemies/shadow_crawler/`, `assets/enemies/spectral_archer/`, `assets/enemies/stone_guardian/`: PNGs de frames e retrato.
+- `assets/tilesets/catacombs/`: atlas e `catacombs.tres`.
+- `assets/environments/props/`: 14 recortes individuais e atlases de detalhes, portas e recompensas.
+- `assets/effects/`: arco, impacto, flecha espectral e corrupção.
+- `assets/concept_manifest.json`, `assets/INTEGRATED_FILES.txt`, `assets/INTEGRATION_REPORT.md`; metadados de importação/UID da Godot.
+
+O inventário contém todos os caminhos dos recursos preparados: 71 PNGs derivados ativos, três originais, manifest e TileSet. Os 11 candidatos não usados foram movidos para a pasta de revisão; nada do projeto anterior foi removido.
+
+### Arquivos modificados
+
+`pixel_actor.gd`, `player.gd`, `enemy.gd`, `dungeon.gd`, `gate.gd`, `effects.gd`, `projectile.gd`, `main.gd`, `hud.gd`, `atmosphere.gd`, `pixel_camera.gd`, `project.godot`, `tests/smoke_test.gd`, `tests/capture.gd`, `README.md`, `assets/README.md` e este documento. `main.tscn`, saves/estrutura de persistência e PNGs legados foram preservados.
+
+### Limitações e retoques manuais
+
+Idle é pose estática; walk tem poucos frames; direções faltantes usam vista oblíqua/espelhamento. Hurt do arqueiro/guardião tem uma pose com flash. Alguns golpes e corpos caídos ainda podem precisar de ajuste fino de pivôs/halos, pois a fonte possui efeitos encostados em vizinhos. Cantos de parede foram adaptados por recomposição/rotação de faces e precisam de revisão artística fina; portas leste/oeste são rotações das arquiteturas disponíveis e alternam estados com crossfade, sem inventar frames de abertura. Corrupção permanece visual/reserva de HUD. As limitações por asset estão em `assets/INTEGRATION_REPORT.md`.
+
+### Testes efetivamente executados
+
+Godot **4.7.2**: importação do editor headless, preparação dos recortes, gravação do TileSet e teste de integração da cena real. **47 verificações, zero falhas**, incluindo caminhos dos sprites novos, avanço real de walk/attack/dash/hurt/death, pivô e raio de colisão, morte animada de inimigos, TileSet por células, portas, navegação, projéteis/dano, três ondas, XP, baú, vitória, derrota e reinício com R. Capturas reais OpenGL Compatibility do vestíbulo, câmara, relicário e feedback foram inspecionadas; na captura da câmara, posições de QA controladas permitem ver os três tipos de inimigo.
+
+Os testes usam algumas posições/dano controlados e não equivalem a uma partida manual completa, exportação ou benchmark. Nenhuma imagem conceitual é mostrada como fundo gigante para simular gameplay.
+
 ## Polimento visual e experiência (13/10/2026)
 
 Etapa aplicada à vertical slice existente, mantendo dano, velocidades, hitboxes, três ondas, navegação, XP, recompensa do baú e condições de vitória/derrota.

@@ -18,6 +18,7 @@ var navigation_timer: float = 0.0
 var travel: Vector2 = Vector2.ZERO
 var visual: PixelActor
 var dying: bool = false
+var action_visual_timer: float = 0.0
 
 func _ready() -> void:
 	add_to_group("enemies")
@@ -28,23 +29,23 @@ func _ready() -> void:
 	circle.radius = 6.0
 	collider.shape = circle
 	add_child(collider)
-	var texture: Texture2D = preload("res://assets/crawler.png")
+	var actor_key: String = "crawler"
 	match enemy_type:
 		"stalker":
-			texture = preload("res://assets/archer.png")
+			actor_key = "archer"
 			speed = 38.0
 			max_health = 24.0
 			contact_damage = 11.0
 			experience_value = 3
 		"brute":
-			texture = preload("res://assets/guardian.png")
+			actor_key = "guardian"
 			speed = 28.0
 			max_health = 78.0
 			contact_damage = 18.0
 			experience_value = 5
 	health = max_health
 	visual = PixelActor.new()
-	visual.configure(texture)
+	visual.configure(actor_key)
 	add_child(visual)
 
 func _physics_process(delta: float) -> void:
@@ -52,6 +53,7 @@ func _physics_process(delta: float) -> void:
 	damage_timer = maxf(0.0, damage_timer - delta)
 	hit_flash = maxf(0.0, hit_flash - delta)
 	shot_timer -= delta
+	action_visual_timer = maxf(0.0,action_visual_timer-delta)
 	navigation_timer -= delta
 	if not is_instance_valid(target) or target.health <= 0.0: return
 	var distance: float = position.distance_to(target.position)
@@ -64,13 +66,20 @@ func _physics_process(delta: float) -> void:
 		velocity = -direction * speed if distance < 56.0 else Vector2.ZERO
 		if shot_timer <= 0.0:
 			shot_timer = 1.6
+			action_visual_timer = 0.18
+			visual.restart_attack(direction)
 			game.spawn_projectile(position + direction * 9.0, direction, 10.0, true)
 			game.effect(position, Color("927aa9"), "attack", direction)
 	move_and_slide()
 	if distance < 14.0 and damage_timer <= 0.0:
 		damage_timer = 0.75
+		action_visual_timer = 0.18
+		visual.restart_attack(direction)
 		target.take_damage(contact_damage)
-	visual.show_state("hurt" if hit_flash > 0.0 else ("walk" if velocity.length() > 1.0 else "idle"), direction)
+	var state: String = "walk" if velocity.length()>1.0 else "idle"
+	if action_visual_timer>0.0: state = "attack"
+	if hit_flash>0.0: state = "hurt"
+	visual.show_state(state,direction)
 	visual.modulate = Color(1.8, 1.8, 1.8) if hit_flash > 0.0 else Color.WHITE
 	queue_redraw()
 
@@ -96,6 +105,9 @@ func take_damage(amount: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
+	draw_set_transform(Vector2(0,1),0,Vector2(1,0.35))
+	draw_circle(Vector2.ZERO,12.0 if enemy_type=="brute" else 9.0,Color("080e1970"))
+	draw_set_transform(Vector2.ZERO)
 	if health < max_health and not dying:
 		draw_rect(Rect2(-10, -31, 20, 3), Color("080e19"))
 		draw_rect(Rect2(-9, -30, maxf(0, 18 * health / max_health), 1), Color("ff947f"))

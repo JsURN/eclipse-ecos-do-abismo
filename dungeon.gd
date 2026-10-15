@@ -34,10 +34,12 @@ func _ready() -> void:
 	var tiles: TileSet = _make_tileset()
 	ground = TileMapLayer.new()
 	ground.name = "StoneAndWalls"
+	ground.scale = Vector2(0.5,0.5)
 	ground.tile_set = tiles
 	add_child(ground)
 	decor = TileMapLayer.new()
 	decor.name = "CatacombRelics"
+	decor.scale = Vector2(0.5,0.5)
 	decor.tile_set = tiles
 	add_child(decor)
 	for y in range(SIZE.y):
@@ -84,6 +86,9 @@ func _ready() -> void:
 	actors.name = "Actors"
 	actors.y_sort_enabled = true
 	add_child(actors)
+	for cell in torch_cells:
+		decor.erase_cell(cell)
+		_fixture(cell,8)
 	for cell in obstacles:
 		_fixture(cell, 1 if decor.get_cell_atlas_coords(cell) == Vector2i(0, 1) else 2)
 	for p in [Vector2i(4, 15), Vector2i(15, 15), Vector2i(30, 11), Vector2i(48, 25)]: _fixture(p, 0)
@@ -110,7 +115,7 @@ func _ready() -> void:
 			navigation.set_point_solid(p, not floor_cells.has(p) or obstacles.has(p))
 	set_gate(1, true)
 	var ambient: CanvasModulate = CanvasModulate.new()
-	ambient.color = Color(0.66, 0.71, 0.85)
+	ambient.color = Color(0.82,0.84,0.93)
 	add_child(ambient)
 
 func _carve(area: Rect2i) -> void:
@@ -123,22 +128,7 @@ func _diagonal_floor(cell: Vector2i) -> bool:
 	return false
 
 func _make_tileset() -> TileSet:
-	var tiles: TileSet = TileSet.new()
-	tiles.tile_size = Vector2i(16, 16)
-	tiles.add_physics_layer()
-	tiles.set_physics_layer_collision_layer(0, 1)
-	var atlas: TileSetAtlasSource = TileSetAtlasSource.new()
-	atlas.texture = preload("res://assets/catacombs_tiles.png")
-	atlas.texture_region_size = Vector2i(16, 16)
-	tiles.add_source(atlas, 0)
-	for i in range(64):
-		var coords: Vector2i = Vector2i(i % 8, i / 8)
-		atlas.create_tile(coords)
-		if (i >= 16 and i < 32) or i == 8 or i == 10:
-			var data: TileData = atlas.get_tile_data(coords, 0)
-			data.add_collision_polygon(0)
-			data.set_collision_polygon_points(0, 0, PackedVector2Array([Vector2(-8,-8), Vector2(8,-8), Vector2(8,8), Vector2(-8,8)]))
-	return tiles
+	return load("res://assets/tilesets/catacombs/catacombs.tres") as TileSet
 
 func _put(layer: TileMapLayer, cell: Vector2i, tile: int) -> void:
 	layer.set_cell(cell, 0, Vector2i(tile % 8, tile / 8))
@@ -170,7 +160,7 @@ func set_gate(index: int, closed: bool) -> void:
 func _add_torch(cell: Vector2i) -> void:
 	_put(decor, cell, 12)
 	torch_cells.append(cell)
-	var light: PointLight2D = _add_light(Vector2(cell * 16) + Vector2(8, 4), Color("71cfdf"), 0.8, 2.5)
+	var light: PointLight2D = _add_light(Vector2(cell*16)+Vector2(8,-14),Color("71cfdf"),0.8,2.5)
 	torches.append(light)
 
 func _add_light(at: Vector2, ink: Color, energy: float, radius_scale: float) -> PointLight2D:
@@ -187,10 +177,11 @@ func _fixture(cell: Vector2i, frame: int) -> void:
 	var root: Node2D = Node2D.new()
 	root.position = Vector2(cell * 16) + Vector2(8, 8)
 	var sprite: Sprite2D = Sprite2D.new()
-	sprite.texture = preload("res://assets/environment.png")
+	sprite.texture = preload("res://assets/environments/props/details_atlas.png")
 	sprite.region_enabled = true
-	sprite.region_rect = Rect2(frame * 32, 0, 32, 48)
-	sprite.position = Vector2(0, -16)
+	sprite.region_rect = Rect2(frame*64,0,64,112)
+	sprite.scale = Vector2(0.5,0.5)
+	sprite.position = Vector2(0,-24)
 	root.add_child(sprite)
 	actors.add_child(root)
 

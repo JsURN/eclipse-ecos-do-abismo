@@ -1,6 +1,22 @@
-# Arte original — Catacumbas do Eclipse
+# Assets — Catacumbas do Eclipse
 
-Todos os PNGs desta pasta são assets locais originais, gerados deterministicamente por `tools/build_art.gd`. Não há dependências de imagens, fontes ou pacotes pagos externos.
+Os recursos **ativos** são recortes das novas folhas fornecidas pelo usuário. Consulte `INTEGRATION_REPORT.md`, `concept_manifest.json` e `INTEGRATED_FILES.txt` para os mapas de recorte, contagem real de frames, transparência e limitações. Originais estão preservados em `source_art/`; candidatos rejeitados ficam isolados nessa pasta e não são usados pelo jogo.
+
+```text
+characters/kael/
+enemies/shadow_crawler/
+enemies/spectral_archer/
+enemies/stone_guardian/
+tilesets/catacombs/
+environments/props/
+effects/
+```
+
+A integração não depende de rede nem de assets pagos. Preparadores são ferramentas offline opcionais; os PNGs e o TileSet prontos já estão no projeto.
+
+## Assets legados preservados (histórico)
+
+Os arquivos antigos na raiz de `assets/` foram mantidos para referência. A documentação abaixo descreve essa base anterior; ela não é o conjunto de sprites/tiles ativo após a integração das folhas conceituais.
 
 ## Atlas de tiles
 

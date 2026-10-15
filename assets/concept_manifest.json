@@ -1,0 +1,1056 @@
+{
+	"actors": {
+		"archer": {
+			"animations": {
+				"attack": [
+					"res://assets/enemies/spectral_archer/attack_00.png",
+					"res://assets/enemies/spectral_archer/attack_01.png"
+				],
+				"death": [
+					"res://assets/enemies/spectral_archer/death_00.png",
+					"res://assets/enemies/spectral_archer/death_01.png"
+				],
+				"hurt": [
+					"res://assets/enemies/spectral_archer/hurt_00.png"
+				],
+				"idle": [
+					"res://assets/enemies/spectral_archer/idle_00.png"
+				],
+				"walk": [
+					"res://assets/enemies/spectral_archer/walk_00.png",
+					"res://assets/enemies/spectral_archer/walk_01.png"
+				]
+			},
+			"fps": {
+				"attack": 11.1111111111111,
+				"death": 5.0,
+				"hurt": 12.0,
+				"idle": 5.0,
+				"walk": 8.0
+			},
+			"frame_size": 160,
+			"pivot": [
+				80,
+				140
+			],
+			"world_scale": 0.5
+		},
+		"crawler": {
+			"animations": {
+				"attack": [
+					"res://assets/enemies/shadow_crawler/attack_00.png",
+					"res://assets/enemies/shadow_crawler/attack_01.png",
+					"res://assets/enemies/shadow_crawler/attack_02.png"
+				],
+				"death": [
+					"res://assets/enemies/shadow_crawler/death_00.png",
+					"res://assets/enemies/shadow_crawler/death_01.png",
+					"res://assets/enemies/shadow_crawler/death_02.png"
+				],
+				"hurt": [
+					"res://assets/enemies/shadow_crawler/hurt_00.png",
+					"res://assets/enemies/shadow_crawler/hurt_01.png"
+				],
+				"idle": [
+					"res://assets/enemies/shadow_crawler/idle_00.png"
+				],
+				"walk": [
+					"res://assets/enemies/shadow_crawler/walk_00.png",
+					"res://assets/enemies/shadow_crawler/walk_01.png"
+				]
+			},
+			"fps": {
+				"attack": 16.6666666666667,
+				"death": 7.5,
+				"hurt": 12.0,
+				"idle": 5.0,
+				"walk": 8.0
+			},
+			"frame_size": 160,
+			"pivot": [
+				80,
+				140
+			],
+			"world_scale": 0.5
+		},
+		"guardian": {
+			"animations": {
+				"attack": [
+					"res://assets/enemies/stone_guardian/attack_00.png",
+					"res://assets/enemies/stone_guardian/attack_01.png"
+				],
+				"death": [
+					"res://assets/enemies/stone_guardian/death_00.png",
+					"res://assets/enemies/stone_guardian/death_01.png",
+					"res://assets/enemies/stone_guardian/death_02.png"
+				],
+				"hurt": [
+					"res://assets/enemies/stone_guardian/hurt_00.png"
+				],
+				"idle": [
+					"res://assets/enemies/stone_guardian/idle_00.png"
+				],
+				"walk": [
+					"res://assets/enemies/stone_guardian/walk_00.png",
+					"res://assets/enemies/stone_guardian/walk_01.png"
+				]
+			},
+			"fps": {
+				"attack": 11.1111111111111,
+				"death": 7.5,
+				"hurt": 12.0,
+				"idle": 5.0,
+				"walk": 8.0
+			},
+			"frame_size": 160,
+			"pivot": [
+				80,
+				140
+			],
+			"world_scale": 0.5
+		},
+		"kael": {
+			"animations": {
+				"attack": [
+					"res://assets/characters/kael/attack_00.png",
+					"res://assets/characters/kael/attack_01.png",
+					"res://assets/characters/kael/attack_02.png"
+				],
+				"dash": [
+					"res://assets/characters/kael/dash_00.png",
+					"res://assets/characters/kael/dash_01.png",
+					"res://assets/characters/kael/dash_02.png"
+				],
+				"death": [
+					"res://assets/characters/kael/death_00.png",
+					"res://assets/characters/kael/death_01.png",
+					"res://assets/characters/kael/death_02.png",
+					"res://assets/characters/kael/death_03.png",
+					"res://assets/characters/kael/death_04.png",
+					"res://assets/characters/kael/death_05.png"
+				],
+				"hurt": [
+					"res://assets/characters/kael/hurt_00.png",
+					"res://assets/characters/kael/hurt_01.png"
+				],
+				"idle": [
+					"res://assets/characters/kael/idle_00.png"
+				],
+				"idle_up": [
+					"res://assets/characters/kael/idle_up_00.png"
+				],
+				"walk": [
+					"res://assets/characters/kael/walk_00.png",
+					"res://assets/characters/kael/walk_01.png"
+				],
+				"walk_up": [
+					"res://assets/characters/kael/walk_up_00.png",
+					"res://assets/characters/kael/walk_up_01.png"
+				]
+			},
+			"fps": {
+				"attack": 16.6666666666667,
+				"dash": 18.75,
+				"death": 15.0,
+				"hurt": 12.0,
+				"idle": 5.0,
+				"idle_up": 5.0,
+				"walk": 8.0,
+				"walk_up": 8.0
+			},
+			"frame_size": 160,
+			"pivot": [
+				80,
+				140
+			],
+			"world_scale": 0.5
+		}
+	},
+	"crops": [
+		{
+			"file": "res://assets/characters/kael/idle_00.png",
+			"foot": [
+				452,
+				190
+			],
+			"rect": [
+				396,
+				65,
+				110,
+				139
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/idle_up_00.png",
+			"foot": [
+				937,
+				192
+			],
+			"rect": [
+				884,
+				71,
+				101,
+				136
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/walk_00.png",
+			"foot": [
+				432,
+				365
+			],
+			"rect": [
+				375,
+				245,
+				112,
+				141
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/walk_01.png",
+			"foot": [
+				540,
+				365
+			],
+			"rect": [
+				482,
+				245,
+				114,
+				141
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/walk_up_00.png",
+			"foot": [
+				866,
+				373
+			],
+			"rect": [
+				809,
+				245,
+				104,
+				143
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/walk_up_01.png",
+			"foot": [
+				969,
+				373
+			],
+			"rect": [
+				914,
+				245,
+				112,
+				143
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/attack_00.png",
+			"foot": [
+				425,
+				550
+			],
+			"rect": [
+				354,
+				430,
+				157,
+				145
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/attack_01.png",
+			"foot": [
+				968,
+				550
+			],
+			"rect": [
+				902,
+				416,
+				184,
+				182
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/attack_02.png",
+			"foot": [
+				1350,
+				550
+			],
+			"rect": [
+				1274,
+				430,
+				164,
+				146
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/dash_00.png",
+			"foot": [
+				113,
+				738
+			],
+			"rect": [
+				40,
+				626,
+				145,
+				128
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/dash_01.png",
+			"foot": [
+				318,
+				738
+			],
+			"rect": [
+				226,
+				623,
+				166,
+				138
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/dash_02.png",
+			"foot": [
+				951,
+				738
+			],
+			"rect": [
+				817,
+				631,
+				200,
+				133
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/hurt_00.png",
+			"foot": [
+				100,
+				913
+			],
+			"rect": [
+				40,
+				800,
+				130,
+				130
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/hurt_01.png",
+			"foot": [
+				263,
+				913
+			],
+			"rect": [
+				190,
+				804,
+				150,
+				125
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/death_00.png",
+			"foot": [
+				99,
+				1064
+			],
+			"rect": [
+				35,
+				968,
+				127,
+				112
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/death_01.png",
+			"foot": [
+				235,
+				1064
+			],
+			"rect": [
+				178,
+				968,
+				125,
+				112
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/death_02.png",
+			"foot": [
+				370,
+				1064
+			],
+			"rect": [
+				300,
+				970,
+				142,
+				107
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/death_03.png",
+			"foot": [
+				525,
+				1064
+			],
+			"rect": [
+				444,
+				984,
+				185,
+				96
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/death_04.png",
+			"foot": [
+				702,
+				1064
+			],
+			"rect": [
+				615,
+				995,
+				183,
+				83
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/characters/kael/death_05.png",
+			"foot": [
+				878,
+				1064
+			],
+			"rect": [
+				799,
+				997,
+				173,
+				81
+			],
+			"resample": 0.6,
+			"source": "res://assets/source_art/kael_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/shadow_crawler/idle_00.png",
+			"foot": [
+				457,
+				77
+			],
+			"rect": [
+				389,
+				36,
+				109,
+				50
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/shadow_crawler/walk_00.png",
+			"foot": [
+				615,
+				151
+			],
+			"rect": [
+				531,
+				98,
+				139,
+				65
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/shadow_crawler/walk_01.png",
+			"foot": [
+				743,
+				151
+			],
+			"rect": [
+				666,
+				99,
+				121,
+				66
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/shadow_crawler/attack_00.png",
+			"foot": [
+				626,
+				235
+			],
+			"rect": [
+				560,
+				164,
+				132,
+				76
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/shadow_crawler/attack_01.png",
+			"foot": [
+				771,
+				235
+			],
+			"rect": [
+				697,
+				164,
+				141,
+				86
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/shadow_crawler/attack_02.png",
+			"foot": [
+				1184,
+				235
+			],
+			"rect": [
+				1092,
+				164,
+				171,
+				84
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/shadow_crawler/hurt_00.png",
+			"foot": [
+				447,
+				317
+			],
+			"rect": [
+				402,
+				264,
+				89,
+				60
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/shadow_crawler/hurt_01.png",
+			"foot": [
+				558,
+				317
+			],
+			"rect": [
+				499,
+				260,
+				112,
+				67
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/shadow_crawler/death_00.png",
+			"foot": [
+				1024,
+				320
+			],
+			"rect": [
+				966,
+				269,
+				110,
+				64
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/shadow_crawler/death_01.png",
+			"foot": [
+				1156,
+				320
+			],
+			"rect": [
+				1079,
+				271,
+				118,
+				62
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/shadow_crawler/death_02.png",
+			"foot": [
+				1270,
+				320
+			],
+			"rect": [
+				1201,
+				257,
+				115,
+				78
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/spectral_archer/idle_00.png",
+			"foot": [
+				590,
+				420
+			],
+			"rect": [
+				542,
+				346,
+				93,
+				85
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/spectral_archer/walk_00.png",
+			"foot": [
+				591,
+				509
+			],
+			"rect": [
+				547,
+				434,
+				83,
+				77
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/spectral_archer/walk_01.png",
+			"foot": [
+				682,
+				509
+			],
+			"rect": [
+				637,
+				433,
+				92,
+				78
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/spectral_archer/attack_00.png",
+			"foot": [
+				841,
+				603
+			],
+			"rect": [
+				785,
+				517,
+				124,
+				100
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/spectral_archer/attack_01.png",
+			"foot": [
+				980,
+				603
+			],
+			"rect": [
+				923,
+				525,
+				122,
+				86
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/spectral_archer/hurt_00.png",
+			"foot": [
+				634,
+				696
+			],
+			"rect": [
+				590,
+				624,
+				91,
+				82
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/spectral_archer/death_00.png",
+			"foot": [
+				992,
+				707
+			],
+			"rect": [
+				930,
+				651,
+				148,
+				74
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/spectral_archer/death_01.png",
+			"foot": [
+				1153,
+				707
+			],
+			"rect": [
+				1080,
+				656,
+				151,
+				62
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/stone_guardian/idle_00.png",
+			"foot": [
+				601,
+				793
+			],
+			"rect": [
+				542,
+				719,
+				111,
+				84
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/stone_guardian/walk_00.png",
+			"foot": [
+				619,
+				879
+			],
+			"rect": [
+				554,
+				806,
+				117,
+				77
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/stone_guardian/walk_01.png",
+			"foot": [
+				739,
+				879
+			],
+			"rect": [
+				672,
+				807,
+				119,
+				79
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/stone_guardian/attack_00.png",
+			"foot": [
+				682,
+				969
+			],
+			"rect": [
+				602,
+				885,
+				135,
+				92
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/stone_guardian/attack_01.png",
+			"foot": [
+				974,
+				969
+			],
+			"rect": [
+				894,
+				894,
+				157,
+				91
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/stone_guardian/hurt_00.png",
+			"foot": [
+				688,
+				1072
+			],
+			"rect": [
+				629,
+				986,
+				125,
+				89
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/stone_guardian/death_00.png",
+			"foot": [
+				1005,
+				1072
+			],
+			"rect": [
+				946,
+				994,
+				115,
+				82
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/stone_guardian/death_01.png",
+			"foot": [
+				1121,
+				1072
+			],
+			"rect": [
+				1066,
+				1005,
+				127,
+				71
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		},
+		{
+			"file": "res://assets/enemies/stone_guardian/death_02.png",
+			"foot": [
+				1284,
+				1072
+			],
+			"rect": [
+				1202,
+				1011,
+				181,
+				67
+			],
+			"resample": 0.8,
+			"source": "res://assets/source_art/enemies_concept.png"
+		}
+	],
+	"effects": {
+		"corruption": "res://assets/effects/corruption.png",
+		"impact": "res://assets/effects/impact.png",
+		"spectral_projectile": "res://assets/effects/spectral_projectile.png",
+		"sword_arc": "res://assets/effects/sword_arc.png"
+	},
+	"props": {
+		"altar": {
+			"index": 5,
+			"path": "res://assets/environments/props/altar.png",
+			"rect": [
+				708,
+				607,
+				202,
+				167
+			]
+		},
+		"banner": {
+			"index": 10,
+			"path": "res://assets/environments/props/banner.png",
+			"rect": [
+				165,
+				750,
+				77,
+				135
+			]
+		},
+		"bones": {
+			"index": 11,
+			"path": "res://assets/environments/props/bones.png",
+			"rect": [
+				610,
+				861,
+				80,
+				63
+			]
+		},
+		"corruption": {
+			"index": 13,
+			"path": "res://assets/environments/props/corruption.png",
+			"rect": [
+				1343,
+				779,
+				103,
+				64
+			]
+		},
+		"crystal": {
+			"index": 3,
+			"path": "res://assets/environments/props/crystal.png",
+			"rect": [
+				1397,
+				607,
+				78,
+				139
+			]
+		},
+		"pillar": {
+			"index": 1,
+			"path": "res://assets/environments/props/pillar.png",
+			"rect": [
+				812,
+				428,
+				79,
+				169
+			]
+		},
+		"roots": {
+			"index": 4,
+			"path": "res://assets/environments/props/roots.png",
+			"rect": [
+				1097,
+				774,
+				67,
+				65
+			]
+		},
+		"rubble": {
+			"index": 12,
+			"path": "res://assets/environments/props/rubble.png",
+			"rect": [
+				624,
+				773,
+				103,
+				86
+			]
+		},
+		"sarcophagus": {
+			"index": 2,
+			"path": "res://assets/environments/props/sarcophagus.png",
+			"rect": [
+				18,
+				611,
+				216,
+				128
+			]
+		},
+		"sarcophagus_open": {
+			"index": 6,
+			"path": "res://assets/environments/props/sarcophagus_open.png",
+			"rect": [
+				241,
+				611,
+				192,
+				129
+			]
+		},
+		"statue": {
+			"index": 0,
+			"path": "res://assets/environments/props/statue.png",
+			"rect": [
+				1266,
+				425,
+				123,
+				177
+			]
+		},
+		"statue_sword": {
+			"index": 7,
+			"path": "res://assets/environments/props/statue_sword.png",
+			"rect": [
+				1509,
+				425,
+				146,
+				179
+			]
+		},
+		"torch": {
+			"index": 8,
+			"path": "res://assets/environments/props/torch.png",
+			"rect": [
+				23,
+				749,
+				57,
+				137
+			]
+		},
+		"torch_alt": {
+			"index": 9,
+			"path": "res://assets/environments/props/torch_alt.png",
+			"rect": [
+				95,
+				759,
+				49,
+				111
+			]
+		}
+	},
+	"sources": {
+		"res://assets/source_art/catacombs_concept.png": {
+			"alpha": 2,
+			"height": 941,
+			"width": 1672
+		},
+		"res://assets/source_art/enemies_concept.png": {
+			"alpha": 2,
+			"height": 1086,
+			"width": 1448
+		},
+		"res://assets/source_art/kael_concept.png": {
+			"alpha": 2,
+			"height": 1086,
+			"width": 1448
+		}
+	}
+}

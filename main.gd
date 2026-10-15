@@ -24,6 +24,7 @@ var ending_text: String = ""
 var chest: Sprite2D
 var portal: Sprite2D
 var camera: PixelCamera
+const PROP_FRAME_WIDTH: int = 64
 
 func _ready() -> void:
 	_ensure_input_map()
@@ -46,6 +47,7 @@ func _ready() -> void:
 	canvas.name = "HUD"
 	add_child(canvas)
 	hud = HUD.new()
+	hud.scale = Vector2(2,2)
 	hud.game = self
 	canvas.add_child(hud)
 
@@ -139,7 +141,7 @@ func _on_enemy_died(enemy: Node2D, experience: int) -> void:
 		player.reset_for_room()
 		dungeon.set_gate(0, false)
 		dungeon.set_gate(1, false)
-		portal.region_rect.position.x = 72
+		portal.region_rect.position.x = PROP_FRAME_WIDTH*3
 		for at in dungeon.gate_positions: effect(at, Color("65dddb"), "gate")
 		_message("CÂMARA PURIFICADA  ·  o relicário está aberto", 5.0)
 
@@ -157,7 +159,7 @@ func _on_player_died() -> void:
 func _interact() -> void:
 	if room_cleared and not chest_open and player.position.distance_to(Dungeon.CHEST) < 38.0:
 		chest_open = true
-		chest.region_rect.position.x = 24
+		chest.region_rect.position.x = PROP_FRAME_WIDTH
 		player.attack_damage += 6.0
 		player.gain_experience(12)
 		player.health = minf(player.max_health, player.health + 35.0)
@@ -184,10 +186,12 @@ func _message(text: String, duration: float) -> void:
 
 func _prop(at: Vector2, frame: int) -> Sprite2D:
 	var sprite: Sprite2D = Sprite2D.new()
-	sprite.texture = preload("res://assets/props.png")
+	sprite.texture = preload("res://assets/environments/props/rewards_atlas.png")
 	sprite.region_enabled = true
-	sprite.region_rect = Rect2(frame * 24, 0, 24, 32)
-	sprite.position = at - Vector2(0, 8)
+	sprite.region_rect = Rect2(frame*PROP_FRAME_WIDTH,0,PROP_FRAME_WIDTH,96)
+	sprite.scale = Vector2(0.5,0.5)
+	sprite.position = at
+	sprite.offset = Vector2(0,-40)
 	dungeon.actors.add_child(sprite)
 	return sprite
 

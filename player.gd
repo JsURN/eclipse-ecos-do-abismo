@@ -36,7 +36,7 @@ func _ready() -> void:
 	collider.shape = shape
 	add_child(collider)
 	visual = PixelActor.new()
-	visual.configure(preload("res://assets/kael.png"))
+	visual.configure("kael")
 	add_child(visual)
 	var light: PointLight2D = PointLight2D.new()
 	light.texture = game.dungeon._glow_texture()
@@ -121,3 +121,7 @@ func reset_for_room() -> void:
 	health = minf(max_health, health + 10.0)
 	attack_cooldown = 0.0
 	health_changed.emit(health, max_health)
+
+func _draw() -> void:
+	draw_set_transform(Vector2(0,1),0,Vector2(1,0.35))
+	draw_circle(Vector2.ZERO,9.0,Color("080e1970"))

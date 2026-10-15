@@ -23,7 +23,7 @@ func _draw() -> void:
 		if not floor_cells.has(cell + Vector2i.UP): draw_rect(Rect2(at, Vector2(16, 4)), Color("080e1948"))
 		if not floor_cells.has(cell + Vector2i.LEFT): draw_rect(Rect2(at, Vector2(3, 16)), Color("080e1932"))
 	for i in range(torch_cells.size()):
-		var at: Vector2 = Vector2(torch_cells[i] * 16) + Vector2(8, 2)
+		var at: Vector2 = Vector2(torch_cells[i]*16)+Vector2(8,-18)
 		var phase: int = int(time * 7.0 + i) % 3
 		draw_rect(Rect2(at + Vector2(phase - 1, -phase), Vector2(1, 3)), Color("c4f4ed"))
 		draw_rect(Rect2(at + Vector2(-3, -4 - fmod(time * 10 + i, 8)), Vector2.ONE), Color("79dedc80"))

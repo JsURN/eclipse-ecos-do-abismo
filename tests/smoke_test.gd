@@ -45,7 +45,29 @@ func _run() -> void:
 	await _frames(45)
 	_check(get_nodes_in_group("visual_effects").is_empty(), "Visual bursts expire and free themselves")
 	_check(game.dungeon.ground is TileMapLayer, "Dungeon uses TileMapLayer")
-	_check(game.player.visual.sprite_frames.get_animation_names().size() == 6, "Kael has six animations")
+	var states_present: bool = true
+	for state in ["idle","walk","attack","dash","hurt","death"]:
+		states_present = states_present and game.player.visual.sprite_frames.has_animation(state)
+	_check(states_present,"Kael has six states from individually extracted frames")
+	var texture: Texture2D = game.player.visual.sprite_frames.get_frame_texture("idle",0)
+	_check(texture.resource_path.begins_with("res://assets/characters/kael/"),"Kael uses the supplied sheet, not the old generated atlas")
+	Input.action_press("move_up")
+	await _frames(10)
+	Input.action_release("move_up")
+	_check(game.player.visual.animation=="walk_up" and game.player.visual.frame>0,"Rear walk uses actual extracted frames and advances")
+	game.player.attack()
+	await _frames(8)
+	_check(game.player.visual.animation=="attack" and game.player.visual.frame>0,"Attack frames advance after the real projectile is spawned")
+	_check(game.player.get_child(0).shape.radius==5.0 and game.player.visual.position==Vector2(0,-30),"Animations preserve the foot pivot and player collision")
+	# Let the test shot expire before later wall-blocking assertions.
+	await _frames(110)
+	game.player.take_damage(8.0)
+	await _frames(9)
+	_check(game.player.visual.animation=="hurt" and game.player.visual.frame>0,"Kael hurt reaction advances during actual damage feedback")
+	game.player.health = 100.0
+	game.player.invulnerability = 0.0
+	game.player.position = game.Dungeon.START
+	_check(game.dungeon.ground.tile_set.resource_path.ends_with("catacombs/catacombs.tres") and game.dungeon.ground.get_used_cells().size()>100,"Scenery is an editable TileSet applied across individual cells")
 	_check(game.dungeon.navigation.get_point_path(Vector2i(10, 19), Vector2i(38, 18)).size() > 0, "Start and combat chamber are connected")
 	_check(game.dungeon.navigation.get_point_path(Vector2i(38, 18), Vector2i(60, 19)).is_empty(), "Treasure gate blocks access before combat")
 	var initial: Vector2 = game.player.position
@@ -57,6 +79,8 @@ func _run() -> void:
 	await _frames(3)
 	Input.action_release("dash")
 	_check(game.player.dash_cooldown > 0.0 and game.player.invulnerability > 0.0, "Dash cooldown and invulnerability")
+	await _frames(3)
+	_check(game.player.visual.animation=="dash" and game.player.visual.frame>0,"Dash uses the extracted action frames")
 	# Real wall collision: west edge of the start room is x=48.
 	game.player.position = Vector2(56, 300)
 	Input.action_press("move_left")
@@ -72,6 +96,11 @@ func _run() -> void:
 	_check(game.combat_started and game.wave == 1, "Entering chamber triggers combat")
 	_check(game.dungeon.gates_closed[0] and game.dungeon.gates_closed[1], "Both combat doors close")
 	_check(get_nodes_in_group("enemies").size() == 4, "First wave spawns four enemies")
+	var supplied_enemies: bool = true
+	for enemy in get_nodes_in_group("enemies"):
+		var art: Texture2D = enemy.visual.sprite_frames.get_frame_texture("idle",0)
+		supplied_enemies = supplied_enemies and art.resource_path.begins_with("res://assets/enemies/")
+	_check(supplied_enemies,"All three enemy archetypes use supplied sprites")
 	Input.action_press("move_left")
 	await _frames(24)
 	Input.action_release("move_left")
@@ -99,6 +128,7 @@ func _run() -> void:
 	archer.shot_timer = 0.0
 	await _frames(2)
 	_check(_projectile_count() > 0, "Spectral archer fires a projectile")
+	_check(archer.visual.animation=="attack","Archer release pose is connected to AI firing")
 	var hp_before: float = game.player.health
 	await _frames(32)
 	_check(game.player.health < hp_before, "Hostile projectile damages Kael")
@@ -109,6 +139,9 @@ func _run() -> void:
 		var enemies: Array[Node] = get_nodes_in_group("enemies")
 		for enemy in enemies: enemy.take_damage(10000.0)
 		await _frames(3)
+		if expected_wave==1:
+			await _frames(9)
+			_check(is_instance_valid(enemies[0]) and enemies[0].visual.animation=="death" and enemies[0].visual.frame>0,"Enemy corpse plays the extracted death sequence before being freed")
 		if expected_wave < 3:
 			game.wave_timer = 0.001
 			await _frames(5)
@@ -124,7 +157,7 @@ func _run() -> void:
 	await process_frame
 	Input.action_release("interact")
 	await process_frame
-	_check(game.chest_open and game.chest.region_rect.position.x == 24, "Chest opens visually")
+	_check(game.chest_open and game.chest.region_rect.position.x == game.PROP_FRAME_WIDTH, "Chest opens visually")
 	_check(game.player.health > 10.0 and game.player.attack_damage >= damage_before + 6, "Chest provides healing, XP and damage (including level-up bonus)")
 	var rewarded_damage: float = game.player.attack_damage
 	game._interact()
@@ -140,6 +173,8 @@ func _run() -> void:
 	await _frames(3)
 	game.player.take_damage(1000.0)
 	_check(game.game_finished and game.player.visual.animation == "death", "Defeat triggers death animation and ending")
+	await _frames(10)
+	_check(game.player.visual.frame>0,"Kael death sequence keeps animating after defeat")
 	var restart: InputEventKey = InputEventKey.new()
 	restart.keycode = KEY_R
 	restart.physical_keycode = KEY_R

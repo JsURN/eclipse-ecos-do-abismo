@@ -73,7 +73,7 @@ func _draw() -> void:
 	if not is_instance_valid(game.player): return
 	var p = game.player
 	# Live portrait and delayed health chip are visual only.
-	var portrait: Texture2D = p.visual.sprite_frames.get_frame_texture("idle", 0)
+	var portrait: Texture2D = preload("res://assets/characters/kael/portrait.png")
 	draw_texture_rect(portrait, Rect2(9, 8, 28, 28), false)
 	_bar(Rect2(40, 22, 99, 6), health_display, Color("e8c48b"))
 	_bar(Rect2(40, 22, 99, 6), float(p.health) / float(p.max_health), Color("d2748f"), false)
@@ -89,7 +89,7 @@ func _draw() -> void:
 	if not game.game_finished:
 		for enemy in get_tree().get_nodes_in_group("enemies"):
 			if enemy.enemy_type != "stalker": continue
-			var screen: Vector2 = enemy.get_global_transform_with_canvas().origin
+			var screen: Vector2 = enemy.get_global_transform_with_canvas().origin/scale
 			if Rect2(4, 38, 376, 150).has_point(screen): continue
 			var at: Vector2 = screen.clamp(Vector2(4, 41), Vector2(380, 185)).round()
 			var aim: Vector2 = (screen - Vector2(192,108)).normalized()

@@ -41,7 +41,7 @@ func _draw() -> void:
 		return
 	if kind == "dash" and ghost:
 		if flipped: draw_set_transform(Vector2.ZERO, 0, Vector2(-1, 1))
-		draw_texture_rect(ghost, Rect2(-16, -28, 32, 32), false, Color(0.35, 0.75, 1.0, 0.48))
+		draw_texture_rect(ghost, Rect2(-40,-70,80,80), false, Color(0.55,0.65,1.0,0.48))
 		draw_set_transform(Vector2.ZERO)
 		for i in range(3):
 			var at: Vector2 = (-direction * (6 + i * 4) + Vector2(0, i * 3 - 10)).round()
@@ -55,15 +55,15 @@ func _draw() -> void:
 		draw_rect(Rect2(point + Vector2.ONE, Vector2.ONE * float(p["size"])), ink.darkened(0.5))
 		draw_rect(Rect2(point, Vector2.ONE * float(p["size"])), ink)
 	if kind == "attack":
-		for i in range(12):
-			var angle: float = direction.angle() - 1.0 + float(i) * 0.18
-			var at: Vector2 = (Vector2.from_angle(angle) * (10 + age * 28)).round()
-			draw_rect(Rect2(at - Vector2(0, 7), Vector2(2, 2)), Color("c4f4ed"))
+		draw_set_transform(Vector2(0,-8),direction.angle())
+		draw_texture_rect(preload("res://assets/effects/sword_arc.png"),Rect2(-12,-16,48,32),false,Color(1,1,1,0.5))
 	elif kind == "impact" or kind == "hurt":
+		draw_texture_rect(preload("res://assets/effects/impact.png"),Rect2(-12,-24,24,16),false)
 		var extent: float = maxf(1, 7 - age * 20)
 		draw_line(Vector2(-extent, -8), Vector2(extent, -8), ink, 1)
 		draw_line(Vector2(0, -8 - extent), Vector2(0, -8 + extent), ink, 1)
 	elif kind == "death":
+		draw_texture_rect(preload("res://assets/effects/corruption.png"),Rect2(-24,-10,48,32),false,Color(1,1,1,0.4))
 		var radius: float = 4 + age * 16
 		for i in range(8):
 			var at: Vector2 = (Vector2.from_angle(i * TAU / 8) * radius).round()
