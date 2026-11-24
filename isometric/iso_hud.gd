@@ -33,6 +33,7 @@ const MAP_PIXELS: Vector2i = Vector2i(116, 72)
 const MAP_FRAME: Rect2 = Rect2(318, 4, 62, 40)
 const MAP_ORIGIN: Vector2 = Vector2(320, 6)
 const REVEAL_RADIUS: int = 6
+const XP_WIDTH: float = 45.0
 const HINT_SECONDS: float = 14.0
 const HINTS: Array = [["WASD", "mover"], ["Mouse", "mirar"], ["J", "atacar"], ["Shift", "esquivar"], ["E", "interagir"]]
 
@@ -87,6 +88,9 @@ func _process(delta: float) -> void:
 		area = current
 		area_fade = 0.0
 		map_dirty = true
+		# A card never outlives its area: leaving it (e.g. crossing the tiny Fenda)
+		# drops the card instead of naming the wrong place.
+		card = ""
 		if not visited.has(area):
 			visited[area] = true
 			card = area
@@ -284,12 +288,13 @@ func _draw_player(p: Node) -> void:
 	var outline: PackedVector2Array = _slant(39, 13, 84, 8)
 	outline.append(outline[0])
 	draw_polyline(outline, GOLD_DEEP, 1.0)
-	# Echoes (experience).
+	# Echoes (experience): label column at x=40 and content column at x=78, like corruption.
 	var xp: float = clampf(float(p.experience) / float(p.experience_to_next), 0.0, 1.0)
-	draw_rect(Rect2(40, 24, 66, 3), Color(SHADE, 0.92))
-	draw_rect(Rect2(40, 24, floorf(66 * xp), 3), CYAN_DEEP.lerp(CYAN, 0.75))
-	if xp > 0.0: draw_line(Vector2(40, 24.5), Vector2(40 + floorf(66 * xp), 24.5), Color("c9fbf3"))
-	_text(body_font, Vector2(109, 28), "ecos", 6, Color(CYAN, 0.8))
+	_text(body_font, Vector2(40, 28), "ecos", 6, Color(CYAN, 0.8))
+	draw_rect(Rect2(78, 24, XP_WIDTH, 3), Color(SHADE, 0.92))
+	draw_rect(Rect2(78, 24, floorf(XP_WIDTH * xp), 3), CYAN_DEEP.lerp(CYAN, 0.75))
+	if xp > 0.0: draw_line(Vector2(78, 24.5), Vector2(78 + floorf(XP_WIDTH * xp), 24.5), Color("c9fbf3"))
+	draw_rect(Rect2(77, 23, XP_WIDTH + 2, 5), Color(CYAN_DEEP, 0.6), false, 1.0)
 	# Corruption (reserved system): five empty sigils until it is implemented.
 	var corruption: float = float(p.get("corruption")) if p.get("corruption") != null else 0.0
 	_text(body_font, Vector2(40, 35), "corrupção", 6, Color(PURPLE_LIGHT, 0.7))
@@ -344,6 +349,10 @@ func _draw_minimap(p: Node) -> void:
 		_diamond(corner, 2.0, GOLD, Color(SHADE, 0.9))
 
 func _draw_sockets(p: Node) -> void:
+	# Soft corner backing (fades up and right) so the key labels stay legible on bright floor.
+	var dark: Color = Color(SHADE, 0.6)
+	var clear: Color = Color(SHADE, 0.0)
+	draw_polygon(PackedVector2Array([Vector2(0, 216), Vector2(0, 178), Vector2(64, 216)]), PackedColorArray([dark, clear, clear]))
 	_socket(Vector2(16, 196), 1.0 - clampf(float(p.attack_cooldown) / 0.22, 0.0, 1.0), GOLD, "J", false)
 	_socket(Vector2(38, 196), 1.0 - clampf(float(p.dash_cooldown) / 0.9, 0.0, 1.0), CYAN, "Shift", true)
 

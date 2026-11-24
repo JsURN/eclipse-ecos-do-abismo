@@ -178,6 +178,13 @@ func _run() -> void:
 	_check(game.get_node("HUD").layer > game.atmosphere.get_node("Vignette").layer, "Vignette stays under the HUD")
 	_check(game.hud.get_script().resource_path.ends_with("iso_hud.gd") and game.hud.revealed.size() > 20, "Isometric HUD with a minimap revealed by exploration (%d cells)" % game.hud.revealed.size())
 	_check((game.objective() != "") != (game.combat_started and not game.room_cleared) and game.action_prompt().is_empty(), "Objective line (waves replace it in combat); no prompt away from chest/exit")
+	game.hud.visited.erase("Fenda Colapsada")
+	_place(Vector2i(45, 40))
+	await _frames(3)
+	var fenda_card: bool = game.hud.card == "Fenda Colapsada"
+	_place(Vector2i(35, 39))
+	await _frames(3)
+	_check(fenda_card and game.hud.card != "Fenda Colapsada", "Area title card is dropped when Kael leaves that area")
 	_check(world.rock.get_used_cells().size() > 300 and world.glow.water_cells.size() >= 15 and world.shafts.size() >= 3, "Rock mass, water pools and moonlight shafts are built")
 
 	# --- elevation -----------------------------------------------------------

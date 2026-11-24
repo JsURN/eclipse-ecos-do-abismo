@@ -24,7 +24,7 @@ Roteiro do mapa: Vestíbulo dos Esquecidos → Passagem das Cinzas (corredor com
 ```text
 godot --headless --path . --editor --quit
 godot --headless --path . --script tests/smoke_test.gd       # slice original: 47 checks
-godot --headless --path . --script tests/iso_smoke_test.gd   # protótipo: 66 checks
+godot --headless --path . --script tests/iso_smoke_test.gd   # protótipo: 67 checks
 godot --path . --script tests/iso_capture.gd                 # capturas em artifacts/iso_*.png (precisa de GPU)
 ```
 
@@ -164,7 +164,7 @@ O protótipo isométrico tem HUD própria; `hud.gd` (top-down) não foi alterado
 | Topo-direita | Minimapa isométrico em moldura chanfrada, revelado conforme Kael explora (raio 6), área atual realçada, poças e estrado em cores próprias; Kael pulsando, inimigos, baú e selo de saída |
 | Base-esquerda | Encaixes em losango para atacar (J) e esquivar (Shift), com ícone e preenchimento de recarga |
 | Base-centro | Prompt contextual só quando há algo a fazer (`action_prompt()`: tecla E + ação, ou o motivo de não poder); nos primeiros segundos, dicas de controle em teclas pequenas que somem sozinhas |
-| Centro | Faixas para ondas/relíquia/selos (título em serifa + subtítulo, cor por tipo), cartão de título ao entrar numa área pela primeira vez (cede lugar às faixas), painel de vitória/derrota com tecla R |
+| Centro | Faixas para ondas/relíquia/selos (título em serifa + subtítulo, cor por tipo), cartão de título ao entrar numa área pela primeira vez (cede lugar às faixas e some ao sair da área), painel de vitória/derrota com tecla R |
 | Bordas | Setas para arqueiros fora da tela; vermelho pulsante nas bordas com vida baixa |
 
 Tipografia: títulos usam fonte serifada do sistema (`SystemFont`: Cinzel, Palatino Linotype, Book Antiqua, Georgia...) com retorno à fonte padrão, sem adicionar arquivos de fonte. O minimapa é desenhado na resolução nativa (meia escala) para ficar nítido.
