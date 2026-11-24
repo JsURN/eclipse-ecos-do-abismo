@@ -135,3 +135,31 @@ Primeira versão jogável implementada em 13/10/2026.
 3. Evoluir o layout fixo para salas procedurais e recursos de dados editáveis.
 4. Implementar corrupção, equipamentos e habilidades adicionais.
 5. Criar chefe e meta-progressão persistente.
+
+## Protótipo isométrico contínuo (24/11/2026)
+
+Primeira etapa da migração para 2D isométrico, em cena separada (`isometric/isometric_prototype.tscn`); `main.tscn` segue como cena principal.
+
+- Mapa contínuo de 60×47 células (layout ASCII em `isometric/catacomb_layout.gd`) com 8 áreas conectadas, um laço entre o Ossário e as Ruínas, pilares, estrado elevado com altar, sarcófagos, paredes desabadas, tochas azuis, runas e selo de saída.
+- Física, IA, A* e combate num plano lógico cartesiano oculto (16 u/célula); visual projetado em losangos 32×16 com Y-sort pelos pés, paredes frontais rebaixadas e transparência contextual.
+- WASD relativo à câmera rotacionado −45° para o mundo: diagonais seguem os corredores e a velocidade é igual nas 8 direções. Dash, ataque, ondas, baú, vitória/derrota e HUD reaproveitados.
+- Arte isométrica placeholder gerada por `tools/build_iso_placeholders.gd`. Detalhes, pendências e lista de assets em `docs/ISOMETRIC_PROTOTYPE.md`.
+- Testes: `tests/iso_smoke_test.gd` (55 checks) e capturas em `tests/iso_capture.gd`; a suíte original continua 47/47.
+
+## Polimento visual do protótipo isométrico (24/11/2026)
+
+Primeira versão visual coesa das Catacumbas isométricas, sem alterar regras de gameplay.
+
+- Novo kit de arte procedural em `assets/isometric/catacombs/`, gerado por `tools/build_iso_art.gd` a partir de geometria isométrica real (caixas e cilindros): piso em lajes irregulares com variações temáticas por área, paredes com topo contínuo, fiadas de pedra, rachaduras, musgo, runas, estandartes, arandelas e nichos com crânios; pilares redondos com caneluras e capitel dourado; batentes com arcos/lintéis; sarcófago, baú (fechado/aberto), pedestal lunar, velas e paredes desabadas.
+- Camadas novas: decalques espelhados (rachaduras, musgo, poças, ossos, fuligem, corrupção), sombreamento na base das paredes, sombras de contato, limiares dourados dos selos e cortinas de energia lunar nos selos.
+- `isometric/iso_atmosphere.gd`: névoa rasteira, fagulhas nas chamas, partículas subindo no altar/pedestais/baú/saída, poeira ao redor da câmera e vinheta abaixo da HUD (~260 partículas de 1 px).
+- Iluminação: luz ambiente mais escura, arandelas e velas com cintilação, luzes de humor por área, brilho dourado pulsante no baú e selo de saída mais forte.
+- Layout: dois pedestais lunares (`Q`) ladeando a escada do selo de saída.
+- Testes: `tests/iso_smoke_test.gd` agora com 62 checks (kit sem placeholders, topos conectados, decoração, arcos, atmosfera, baú aberto); suíte original 47/47.
+
+## Refinamento do cenário e nova HUD isométrica (24/11/2026)
+
+- Cenário: massa de rocha elevada ao redor das salas (altura calculada para nunca cobrir piso ou paredes; cortada à frente das salas) que escurece com a distância, eliminando o preto cru; pilastras, cantos com pedras angulares e trechos desabados nas paredes longas; mosaico lunar, anéis dourados, fendas com brilho corrompido, poças rasas, tocos de coluna, coluna caída, urnas e pilha de ossos; pedra-chave com crescente nos arcos; feixes de luar sobre os pontos de interesse.
+- HUD própria do protótipo (`isometric/iso_hud.gd`, `hud.gd` intacto): retrato octogonal, gema de nível, barras inclinadas, área + objetivo único, losangos de onda, minimapa isométrico revelado por exploração, encaixes de ataque/esquiva com recarga, prompt contextual (E) e dicas iniciais que somem, faixas de onda/relíquia, cartões de área e painel de final.
+- `iso_prototype.gd` expõe `objective()`, `action_prompt()` e `wave_total()` para a HUD.
+- Testes: `tests/iso_smoke_test.gd` com 66 checks; suíte original 47/47; `tests/iso_capture.gd` também captura HUD inicial, prompt e final.

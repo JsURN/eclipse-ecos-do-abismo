@@ -37,6 +37,10 @@ A HUD ficou compacta; vida, XP, nível, corrupção reservada e recarga do dash 
 
 Os PNGs preparados e o TileSet editável já estão incluídos. O jogo não requer downloads nem execução dos preparadores. Os gráficos simplificados antigos foram preservados como legado.
 
+## Protótipo isométrico (experimental)
+
+Uma área contínua das Catacumbas em 2D isométrico (losangos 32×16, Y-sort pelos pés, transparência contextual de paredes) convive com a slice top-down. Abra `res://isometric/isometric_prototype.tscn` e use **F6**. Física, IA e combate rodam num plano lógico cartesiano oculto; só a visualização é projetada. O cenário usa um kit de arte procedural de primeira passada (`tools/build_iso_art.gd` → `assets/isometric/catacombs/`), com temas por área, rocha maciça ao redor das salas, arcos, selos de energia, iluminação e atmosfera (`isometric/iso_atmosphere.gd`), e HUD própria (`isometric/iso_hud.gd`: retrato, minimapa revelado por exploração, objetivos e prompts contextuais). Decisões de coordenadas, direção de arte, sistemas reaproveitados, pendências e assets a produzir estão em [docs/ISOMETRIC_PROTOTYPE.md](docs/ISOMETRIC_PROTOTYPE.md).
+
 ## Verificação e manutenção
 
 Com a Godot disponível no PATH (ou substitua `godot` pelo caminho do executável):
@@ -44,6 +48,7 @@ Com a Godot disponível no PATH (ou substitua `godot` pelo caminho do executáve
 ```text
 godot --headless --path . --editor --quit
 godot --headless --path . --script tests/smoke_test.gd
+godot --headless --path . --script tests/iso_smoke_test.gd
 ```
 
 Para refazer os recortes das fontes preservadas e reimportá-los:

@@ -54,7 +54,7 @@ func _physics_process(delta: float) -> void:
 	dash_cooldown = maxf(0.0, dash_cooldown - delta)
 	dash_timer = maxf(0.0, dash_timer - delta)
 	invulnerability = maxf(0.0, invulnerability - delta)
-	var input_vector: Vector2 = Input.get_vector("move_left", "move_right", "move_up", "move_down")
+	var input_vector: Vector2 = _movement_input()
 	if input_vector.length_squared() > 0.01:
 		last_direction = input_vector.normalized()
 	if Input.is_action_just_pressed("dash") and dash_cooldown <= 0.0:
@@ -83,14 +83,23 @@ func _physics_process(delta: float) -> void:
 func attack() -> void:
 	attack_cooldown = 0.22
 	attack_visual_timer = 0.18
-	var aim: Vector2 = last_direction
-	var mouse_direction: Vector2 = get_global_mouse_position() - global_position
-	if mouse_direction.length_squared() > 16.0:
-		aim = mouse_direction.normalized()
+	var aim: Vector2 = _aim_direction(last_direction)
 	last_direction = aim
 	visual.restart_attack(aim)
 	game.spawn_projectile(global_position + aim * 8.0, aim, attack_damage)
 	game.effect(global_position + aim * 8.0, Color("b7f6ee"), "attack", aim)
+
+## Movement intent in WORLD space. Overridden by isometric/iso_player.gd, which
+## rotates camera-relative input onto the isometric grid.
+func _movement_input() -> Vector2:
+	return Input.get_vector("move_left", "move_right", "move_up", "move_down")
+
+## Attack direction in WORLD space; falls back when the cursor is on Kael.
+func _aim_direction(fallback: Vector2) -> Vector2:
+	var mouse_direction: Vector2 = get_global_mouse_position() - global_position
+	if mouse_direction.length_squared() > 16.0:
+		return mouse_direction.normalized()
+	return fallback
 
 func take_damage(amount: float) -> void:
 	if invulnerability > 0.0 or health <= 0.0 or game.game_finished:

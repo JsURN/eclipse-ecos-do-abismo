@@ -27,9 +27,21 @@ func _ready() -> void:
 	var map_image: Image = Image.create(42, 26, false, Image.FORMAT_RGBA8)
 	map_image.fill(Color.TRANSPARENT)
 	for cell in game.dungeon.floor_cells:
-		var pixel: Vector2i = Vector2i((Vector2(cell) * Vector2(0.6, 0.7)).floor())
-		map_image.set_pixelv(pixel, Color("38465d"))
+		var pixel: Vector2i = Vector2i(_minimap_point(Vector2(cell)).floor())
+		if Rect2i(Vector2i.ZERO, map_image.get_size()).has_point(pixel): map_image.set_pixelv(pixel, Color("38465d"))
 	minimap_texture = ImageTexture.create_from_image(map_image)
+
+## Cell coordinates -> minimap pixels. Scenes with another projection (the
+## isometric prototype) provide game.minimap_point().
+func _minimap_point(cell: Vector2) -> Vector2:
+	if game.has_method("minimap_point"): return game.minimap_point(cell)
+	return cell * Vector2(0.6, 0.7)
+
+## Where a gameplay node appears on screen. Isometric bodies live in a hidden
+## logic layer, so the scene maps them to their visual proxy.
+func _canvas_point(node: Node2D) -> Vector2:
+	if game.has_method("canvas_point"): return game.canvas_point(node)
+	return node.get_global_transform_with_canvas().origin
 
 func _label(key: String, value: String, at: Vector2, font_size: int, ink: String) -> void:
 	var label: Label = Label.new()
@@ -84,12 +96,12 @@ func _draw() -> void:
 	draw_rect(Rect2(29, 206, floor(26 * cooldown), 1), Color("79dedc"))
 	var origin: Vector2 = Vector2(333, 8)
 	draw_texture(minimap_texture, origin)
-	draw_rect(Rect2((origin + Vector2(p.position) / 16.0 * Vector2(0.6, 0.7)).floor(), Vector2(2, 2)), Color("e8c48b"))
+	draw_rect(Rect2((origin + _minimap_point(Vector2(p.position) / 16.0)).floor(), Vector2(2, 2)), Color("e8c48b"))
 	# Indicators warn about shooters beyond the closer camera's field of view.
 	if not game.game_finished:
 		for enemy in get_tree().get_nodes_in_group("enemies"):
 			if enemy.enemy_type != "stalker": continue
-			var screen: Vector2 = enemy.get_global_transform_with_canvas().origin/scale
+			var screen: Vector2 = _canvas_point(enemy)/scale
 			if Rect2(4, 38, 376, 150).has_point(screen): continue
 			var at: Vector2 = screen.clamp(Vector2(4, 41), Vector2(380, 185)).round()
 			var aim: Vector2 = (screen - Vector2(192,108)).normalized()
