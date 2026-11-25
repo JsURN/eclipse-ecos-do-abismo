@@ -30,6 +30,7 @@ const RegionStyle = preload("res://isometric/iso_region_style.gd")
 const Architecture = preload("res://isometric/iso_architecture.gd")
 const Abyss = preload("res://isometric/iso_abyss.gd")
 const Lighting = preload("res://isometric/iso_lighting.gd")
+const Portal = preload("res://isometric/iso_portal.gd")
 const Tier = Lighting.Tier
 
 const ART: String = "res://assets/isometric/catacombs/"
@@ -68,12 +69,12 @@ const PROPS: Dictionary = {
 	"X": {"art": [ART + "sarcophagus.png"], "block": true, "box": 14.0, "shadow": 13.0},
 	"C": {"art": [ART + "chest_closed.png"], "block": true, "box": 14.0, "shadow": 10.0},
 	"Q": {"art": [ART + "pedestal.png"], "block": true, "radius": 6.0, "light": Color("65dddb"), "light_height": 26.0, "shadow": 10.0, "motes": Color("8ff2ea"), "tier": Tier.INTEREST, "pool": 32.0},
-	"S": {"art": [PROPS_DIR + "statue_sword.png"], "radius": 7.0, "occluder": true, "shadow": 10.0},
-	"T": {"art": [PROPS_DIR + "torch.png"], "radius": 4.0, "light": Color("71cfdf"), "torch": true, "shadow": 5.0, "tier": Tier.ARCHITECTURAL, "pool": 64.0},
-	"A": {"art": [PROPS_DIR + "altar.png"], "radius": 7.0, "light": Color("9674d6"), "motes": Color("c7a2e6"), "tier": Tier.INTEREST, "energy": 1.0, "light_scale": 2.8, "pool": 96.0},
-	"c": {"art": [PROPS_DIR + "crystal.png"], "radius": 5.0, "light": Color("9674d6"), "shadow": 6.0},
-	"r": {"art": [PROPS_DIR + "rubble.png"], "radius": 5.0},
-	"B": {"art": [PROPS_DIR + "bones.png"]},
+	"S": {"art": [ART + "statue.png"], "block": true, "radius": 7.0, "occluder": true, "shadow": 11.0},
+	"T": {"art": [ART + "brazier.png"], "block": true, "radius": 4.0, "light": Color("71cfdf"), "light_height": 22.0, "torch": true, "flame": 17.0, "shadow": 6.0, "tier": Tier.ARCHITECTURAL, "pool": 64.0},
+	"A": {"art": [ART + "altar.png"], "block": true, "radius": 7.0, "shadow": 12.0, "light": Color("9674d6"), "motes": Color("c7a2e6"), "tier": Tier.INTEREST, "energy": 1.0, "light_scale": 2.8, "pool": 96.0},
+	"c": {"art": [ART + "crystal.png"], "block": true, "radius": 5.0, "light": Color("9674d6"), "shadow": 6.0},
+	"r": {"art": [ART + "rubble.png"], "block": true, "radius": 5.0, "shadow": 9.0},
+	# B (bones) is a walkable floor decal now (see _paint_floor), not a standing sprite.
 	"G": {"art": [ART + "pillar_stump.png"], "block": true, "radius": 7.0, "shadow": 11.0},
 	"F": {"art": [ART + "fallen_column.png"], "block": true, "box": 14.0, "shadow": 12.0},
 	"U": {"art": [ART + "urns.png"], "block": true, "radius": 6.0, "shadow": 9.0},
@@ -122,6 +123,13 @@ var wall_kinds: Dictionary = {}
 var decorated: Array[Vector2i] = []
 var sconces: Array[Vector2i] = []
 var broken_cells: Array[Vector2i] = []
+## Floor torch cell -> wall cell that carries it as a sconce instead (_plan_wall_torches).
+var wall_torches: Dictionary = {}
+## Arched portals (_plan_portals): post cell / passage cell -> [axis, n, k, ruined],
+## k = -1 low pylon, 0..n-1 passage cells, n high pylon (iso_portal.gd).
+var portal_posts: Dictionary = {}
+var portal_cells: Dictionary = {}
+var portal_images: Dictionary = {}
 ## Screen points lit by moonlight shafts (iso_atmosphere.gd).
 var shafts: Array[Vector2] = []
 
@@ -163,6 +171,8 @@ func _ready() -> void:
 	lights.setup(_glow_texture(), light_pools)
 	add_child(lights)
 	_paint_floor()
+	_plan_wall_torches()
+	_plan_portals()
 	_build_walls()
 	_build_arches()
 	_build_props()
@@ -354,6 +364,8 @@ func _paint_floor() -> void:
 				_put(ground, cell, special if special >= 0 else plain, tint)
 				var decal: int = _pick(theme["decals"], (noise / 7) % 100)
 				if decal >= 0 and symbol == ".": detail.set_cell(cell, SOURCE_DECAL, Vector2i(decal, 0), (noise / 1000) % 4)
+				# Bones lie flat on the floor (decal) instead of a front-facing standing sprite.
+				if symbol == "B": detail.set_cell(cell, SOURCE_DECAL, Vector2i(4, 0), (noise / 1000) % 4)
 			var mask: int = 0
 			for bit in range(4):
 				if not is_floor(cell + [Vector2i(-1, 0), Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1)][bit]): mask |= 1 << bit
@@ -427,20 +439,18 @@ func _rock_level(cell: Vector2i) -> int:
 	if level == ROCK_HEIGHTS.size() - 1 and _noise(cell) % 6 == 0: level -= 1
 	return level
 
-## Screen polyline of a fissure: each segment split in three with a small deterministic
-## sideways jitter, so the crack zigzags instead of running in straight strokes.
-func _fissure(path: Array) -> PackedVector2Array:
-	var points: PackedVector2Array = PackedVector2Array()
+## Tile-aligned crack decals along a path of cells (see _build_floor_features).
+func _fault_line(path: Array, seep: int) -> void:
+	var visited: Dictionary = {}
 	for i in range(path.size() - 1):
-		var a: Vector2 = IsoMath.world_to_screen(Vector2(path[i]) * IsoMath.CELL)
-		var b: Vector2 = IsoMath.world_to_screen(Vector2(path[i + 1]) * IsoMath.CELL)
-		var side: Vector2 = (b - a).orthogonal().normalized()
-		points.append(a.round())
-		for k in range(1, 3):
-			var jitter: float = float(_noise(Vector2i(i * 3 + k, path.size())) % 5) - 2.0
-			points.append((a.lerp(b, k / 3.0) + side * jitter).round())
-	points.append(IsoMath.world_to_screen(Vector2(path[path.size() - 1]) * IsoMath.CELL).round())
-	return points
+		var a: Vector2 = path[i]
+		var b: Vector2 = path[i + 1]
+		for k in range(int(a.distance_to(b) * 2.0) + 1):
+			var cell: Vector2i = Vector2i(a.lerp(b, k / maxf(1.0, a.distance_to(b) * 2.0)).floor())
+			if visited.has(cell) or Layout.char_at(cell) != ".": continue
+			visited[cell] = true
+			var decal: int = seep if visited.size() % 3 == 0 else 0
+			detail.set_cell(cell, SOURCE_DECAL, Vector2i(decal, 0), _noise(cell) % 4)
 
 ## True when a hall lies behind `cell` on screen (same probe as _rock_level's cut rule).
 func _in_front_of_hall(cell: Vector2i) -> bool:
@@ -459,15 +469,15 @@ func _build_floor_features() -> void:
 	# Eclipse corona engraved around the dais: the ritual heart of the arena.
 	glow.inlays.append({"center": Vector2(37, 15) * IsoMath.CELL, "radius": 70.0, "kind": "corona"})
 	glow.inlays.append({"center": Vector2(35.5, 39.5) * IsoMath.CELL, "radius": 40.0, "kind": "ring"})
-	# Fissures: [path in cells, glow colour]. Ash corridor smoulders dull gold; the rift
-	# and the chamber leak corrupted violet.
+	# Fault lines: instead of long free-hand strokes (which read as scribbles), the
+	# cells along each path get tile-aligned crack decals, with a mark of what seeps out
+	# every few cells (corruption in the rift and the chamber, soot in the ash corridor).
 	for entry in [
-		[[Vector2(41.5, 39.3), Vector2(43.5, 40.4), Vector2(46.0, 39.5), Vector2(48.5, 40.5), Vector2(50.5, 39.6)], Color(0.62, 0.42, 0.82)],
-		[[Vector2(19.2, 13.6), Vector2(21.5, 12.7), Vector2(23.8, 13.9), Vector2(25.2, 13.2)], Color(0.78, 0.55, 0.3)],
-		[[Vector2(38.2, 21.6), Vector2(40.0, 23.0), Vector2(42.6, 22.3), Vector2(44.5, 23.4)], Color(0.62, 0.42, 0.82)],
+		[[Vector2(41.5, 39.3), Vector2(43.5, 40.4), Vector2(46.0, 39.5), Vector2(48.5, 40.5), Vector2(50.5, 39.6)], 5],
+		[[Vector2(19.2, 13.6), Vector2(21.5, 12.7), Vector2(23.8, 13.9), Vector2(25.2, 13.2)], 7],
+		[[Vector2(38.2, 21.6), Vector2(40.0, 23.0), Vector2(42.6, 22.3), Vector2(44.5, 23.4)], 5],
 	]:
-		glow.cracks.append(_fissure(entry[0]))
-		glow.crack_tints.append(entry[1])
+		_fault_line(entry[0], int(entry[1]))
 	for spot: Vector2 in [Vector2(start_cell) + Vector2(0.5, 0.5), Vector2(37, 15), Vector2(35.5, 39.5), Vector2(53.5, 41.5)]:
 		shafts.append(IsoMath.world_to_screen(spot * IsoMath.CELL))
 
@@ -504,7 +514,8 @@ func _build_walls() -> void:
 			if kind == WallKind.NONE: continue
 			var sprite: Sprite2D
 			if kind == WallKind.POST:
-				sprite = _block(cell, ART + "door_post.png", true)
+				# Door posts are the pylons of their portal (a lone post keeps the old art).
+				sprite = _portal_piece(cell, portal_posts[cell]) if portal_posts.has(cell) else _block(cell, ART + "door_post.png", true)
 				glow.shadows.append([sprite.position, 12.0])
 			else:
 				var full: bool = kind == WallKind.FULL
@@ -520,6 +531,38 @@ func _build_walls() -> void:
 			if kind != WallKind.LOW: _register_occluder(cell, sprite)
 			if kind == WallKind.FULL and sconces.has(cell): _add_sconce(cell, sprite)
 
+## Most floor torches become wall sconces: a free-standing torch only stays where it
+## frames something (within 2 cells of the relic chest, the altar or a door post).
+## Each moved torch hangs on the nearest back wall that faces the room (not a corner,
+## not beside a door post); its cell keeps a waystone, so collision is unchanged.
+func _plan_wall_torches() -> void:
+	for y in range(Layout.size().y):
+		for x in range(Layout.size().x):
+			var torch: Vector2i = Vector2i(x, y)
+			if Layout.char_at(torch) != "T" or _frames_feature(torch): continue
+			var best: Vector2i = Vector2i(-1, -1)
+			var best_score: int = 1 << 30
+			for dy in range(-2, 3):
+				for dx in range(-2, 3):
+					var wall: Vector2i = torch + Vector2i(dx, dy)
+					if _wall_kind(wall) != WallKind.FULL or architecture._beside_post(wall) or architecture.forced.has(wall): continue
+					var below: bool = is_floor(wall + Vector2i(0, 1))
+					var right: bool = is_floor(wall + Vector2i(1, 0))
+					if below == right: continue
+					var score: int = (absi(dx) + absi(dy)) * 100 + _noise(wall) % 100
+					if score < best_score:
+						best_score = score
+						best = wall
+			if best.x < 0: continue
+			architecture.forced[best] = true
+			wall_torches[torch] = best
+
+func _frames_feature(cell: Vector2i) -> bool:
+	for dy in range(-2, 3):
+		for dx in range(-2, 3):
+			if "CAD".contains(Layout.char_at(cell + Vector2i(dx, dy))): return true
+	return false
+
 ## Variant rules live in iso_architecture.gd; this only tells broken rows apart.
 static func _is_broken(kind: int, row: int) -> bool:
 	if kind != WallKind.FULL and kind != WallKind.LOW: return false
@@ -529,16 +572,22 @@ static func _is_broken(kind: int, row: int) -> bool:
 ## light on the floor in front of the wall it hangs on.
 func _add_sconce(cell: Vector2i, wall: Sprite2D) -> void:
 	var on_left: bool = int(wall.get_meta("wall_row")) % 2 == 1
-	var flame: Vector2 = Vector2(-8.0 if on_left else 8.0, -22.0)
-	torches.append(lights.add(wall.position + flame + Vector2(-1.0 if on_left else 1.0, 2.0), Color("71cfdf"), 0.8, 2.0, Tier.ARCHITECTURAL))
+	var flame: Vector2 = Vector2(-8.0 if on_left else 8.0, -27.0)
+	# Animated flame over the bracket; the light sits just in front of it so it washes
+	# the stone around the sconce and the floor at the foot of the wall.
+	lights.add_flame(wall, Vector2(-8.0 if on_left else 8.0, -19.0), false)
+	torches.append(lights.add(wall.position + flame + Vector2(-2.0 if on_left else 2.0, 4.0), Color("71cfdf"), 0.95, 2.3, Tier.ARCHITECTURAL))
 	var front: Vector2i = cell + (Vector2i(0, 1) if on_left else Vector2i(1, 0))
-	lights.add_pool(IsoMath.cell_to_screen(front), Color("71cfdf"), 48.0, 0.1)
+	lights.add_pool(IsoMath.cell_to_screen(front), Color("71cfdf"), 64.0, 0.14)
 	flames.append({"at": wall.position, "offset": flame, "color": Color("9ff5ee")})
 
-## Stone lintels between every pair of door posts: the passages read as arches. In
-## areas that are falling apart (RegionStyle "broken" > 0) the arch has collapsed: only
-## the stubs keyed into each post remain. The entrance gate stays intact.
-func _build_arches() -> void:
+## Every pair of door posts facing each other across a passage becomes an arched
+## portal (iso_portal.gd geometry, sprites from portal_{x,y}.png): the posts are its
+## pylons and each passage cell gets the slice of the voussoir ring above it, so the
+## ring is one continuous arch while every slice still y-sorts with the actors. In
+## areas that are falling apart (RegionStyle "broken" > 0) the ring has collapsed and
+## only the springers remain; the entrance gate stays intact.
+func _plan_portals() -> void:
 	for y in range(Layout.size().y):
 		for x in range(Layout.size().x):
 			var post: Vector2i = Vector2i(x, y)
@@ -547,20 +596,69 @@ func _build_arches() -> void:
 				for span in range(2, 6):
 					var other: Vector2i = post + axis * span
 					if Layout.char_at(other) == "D":
+						var n: int = span - 1
+						if not Portal.SPANS.has(n): break
 						var ruined: bool = _ruined_arch(post + axis * (span / 2), axis)
-						for step in range(1, span):
-							var cell: Vector2i = post + axis * step
-							var key: bool = step == span / 2
-							var art: String = "lintel_%s%s.png" % ["x" if axis.x == 1 else "y", "_key" if key else ""]
-							if ruined:
-								if step != 1 and step != span - 1: continue
-								art = "lintel_%s_stub_%s.png" % ["x" if axis.x == 1 else "y", "a" if step == 1 else "b"]
-							var lintel: Sprite2D = _block(cell, ART + art, true)
-							lintel.name = "Arch_%d_%d" % [cell.x, cell.y]
-							_register_occluder(cell, lintel)
-							arches.append(lintel)
+						portal_posts[post] = [axis, n, -1, ruined]
+						portal_posts[other] = [axis, n, n, ruined]
+						for step in range(1, span): portal_cells[post + axis * step] = [axis, n, step - 1, ruined]
 						break
 					if not is_floor(other): break
+
+func _build_arches() -> void:
+	var rings: Dictionary = {}
+	for cell: Vector2i in portal_cells:
+		var info: Array = portal_cells[cell]
+		var piece: Sprite2D = _portal_piece(cell, info)
+		if piece == null: continue  # collapsed crown: nothing left above this cell
+		piece.name = "Arch_%d_%d" % [cell.x, cell.y]
+		piece.set_meta("portal", {"n": info[1], "k": info[2], "ruined": info[3]})
+		_register_occluder(cell, piece)
+		arches.append(piece)
+		var low_post: Vector2i = cell - Vector2i(info[0]) * (int(info[2]) + 1)
+		if not rings.has(low_post): rings[low_post] = []
+		rings[low_post].append(piece)
+	# The slices of one ring fade together (iso_occlusion_fader.gd), so the arch never
+	# shows a half-transparent seam while Kael walks under it.
+	for low_post: Vector2i in rings:
+		for piece: Sprite2D in rings[low_post]: piece.set_meta("fade_group", rings[low_post])
+
+## Sprite of one portal piece, cropped to its opaque pixels (tight occluder rect).
+## Returns null when the piece is empty (above the gap of a collapsed ring).
+func _portal_piece(cell: Vector2i, info: Array) -> Sprite2D:
+	var art: String = ART + ("portal_x.png" if Vector2i(info[0]).x == 1 else "portal_y.png")
+	var region: Rect2i = Portal.region(int(info[1]), int(info[2]), bool(info[3]))
+	var key: String = "%s %s" % [art, region]
+	if not used_rects.has(key):
+		if not portal_images.has(art): portal_images[art] = _texture(art).get_image()
+		used_rects[key] = (portal_images[art] as Image).get_region(region).get_used_rect()
+	var used: Rect2i = used_rects[key]
+	if used.size.x == 0 or used.size.y == 0: return null
+	var sprite: Sprite2D = Sprite2D.new()
+	sprite.texture = _texture(art)
+	sprite.centered = false
+	sprite.region_enabled = true
+	sprite.region_rect = Rect2(Rect2i(region.position + used.position, used.size))
+	sprite.offset = Vector2(-16, -(region.size.y - 8)) + Vector2(used.position)
+	sprite.position = IsoMath.cell_to_screen(cell)
+	depth.add_child(sprite)
+	return sprite
+
+## Fits each seal curtain to its arch: the energy fills the opening up to just under
+## the intrados instead of a flat 34 px pane that would poke through the voussoirs.
+## A seal standing one cell before or after its arch (the gallery's) takes the shape
+## of that arch as well, so it reads as the opening's lunar membrane.
+func _fit_seal(seal: IsoSeal) -> void:
+	var tops: Array = []
+	var across: Vector2i = Vector2i(seal.along.y, seal.along.x)
+	for cell: Vector2i in seal.cells:
+		var samples: PackedFloat32Array = PackedFloat32Array()
+		var info: Array = portal_cells.get(cell, portal_cells.get(cell - across, portal_cells.get(cell + across, [])))
+		for j in range(9):
+			if info.is_empty(): samples.append(IsoSeal.CURTAIN_HEIGHT)
+			else: samples.append(Portal.intrados(int(info[1]), 16.0 * int(info[2]) + j * 2.0) - 2.0)
+		tops.append(samples)
+	seal.fit_opening(tops)
 
 func _ruined_arch(middle: Vector2i, axis: Vector2i) -> bool:
 	if int(_theme(middle)["broken"]) <= 0: return false
@@ -581,9 +679,13 @@ func _build_props() -> void:
 			var lift: float = float(Layout.HEIGHTS.get(symbol, 0.0))
 			var variants: Array = data["art"]
 			var art: String = String(variants[_noise(cell) % variants.size()])
+			# A floor torch moved onto the wall leaves a carved waystone (same collision).
+			var moved_torch: bool = symbol == "T" and wall_torches.has(cell)
+			if moved_torch: art = ART + "marker.png"
 			var sprite: Sprite2D
 			if data.get("block", false):
 				sprite = _block(cell, art, data.get("occluder", false))
+				sprite.offset.y -= lift
 			else:
 				sprite = Sprite2D.new()
 				sprite.texture = _texture(art)
@@ -597,7 +699,7 @@ func _build_props() -> void:
 			if data.has("shadow"): glow.shadows.append([sprite.position - Vector2(0, lift), float(data["shadow"])])
 			if data.get("occluder", false): _register_occluder(cell, sprite)
 			var light_at: Vector2 = sprite.position - Vector2(0, float(data.get("light_height", 26.0)) + lift)
-			if data.has("light"):
+			if data.has("light") and not moved_torch:
 				# Braziers are architectural light; altar and pedestals are points of
 				# interest (stronger, slow pulse, floor pool in their signature colour).
 				var tier: int = int(data.get("tier", Tier.AMBIENT))
@@ -605,7 +707,9 @@ func _build_props() -> void:
 				if data.has("pool"): lights.add_pool(sprite.position - Vector2(0, lift), data["light"], float(data["pool"]), 0.16 if tier == Tier.INTEREST else 0.11)
 				if data.get("torch", false):
 					torches.append(light)
-					flames.append({"at": sprite.position, "offset": Vector2(0, -27), "color": Color("9ff5ee")})
+					var bowl: float = float(data.get("flame", 17.0))
+					lights.add_flame(sprite, Vector2(0, -bowl), true)
+					flames.append({"at": sprite.position, "offset": Vector2(0, -bowl - 10.0), "color": Color("9ff5ee")})
 			if data.has("motes"): motes.append({"at": light_at, "color": data["motes"], "amount": 8, "radius": 8.0})
 	chest_light = lights.add(IsoMath.world_to_screen(chest_position) - Vector2(0, 12), Color("e0bf7a"), 0.75, 1.8, Tier.INTEREST)
 	chest_pool = lights.add_pool(IsoMath.world_to_screen(chest_position), Color("e0bf7a"), 48.0, 0.18)
@@ -630,6 +734,8 @@ func _build_candles() -> void:
 			var candles: Sprite2D = Sprite2D.new()
 			candles.name = "Candles_%d_%d" % [x, y]
 			candles.texture = _texture(ART + "candles.png")
+			candles.hframes = 4
+			lights.animate(candles, 4, 6.0)
 			candles.centered = false
 			candles.offset = Vector2(-8, -12)
 			candles.position = IsoMath.cell_to_screen(cell) + Vector2(float(noise % 7) - 3.0, float((noise / 7) % 5) - 2.0)
@@ -729,6 +835,7 @@ func _build_logic() -> void:
 		seal.name = "Seal%d" % seals.size()
 		logic_root.add_child(seal)
 		seal.setup(seal_cells, depth)
+		_fit_seal(seal)
 		seals.append(seal)
 		glow.thresholds.append(seal.threshold())
 	navigation = AStarGrid2D.new()

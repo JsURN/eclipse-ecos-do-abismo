@@ -16,10 +16,6 @@ var thresholds: Array[PackedVector2Array] = []
 var water_cells: Dictionary = {}
 ## Gilded floor inlays: {"center": world Vector2, "radius": world units, "kind": "mosaic" | "ring"}.
 var inlays: Array[Dictionary] = []
-## Large fissures (screen polylines) leaking a faint corrupted glow.
-var cracks: Array[PackedVector2Array] = []
-## Glow colour per fissure (same index as `cracks`); violet when missing.
-var crack_tints: Array[Color] = []
 var time: float = 0.0
 const GOLD_INLAY: Color = Color(0.77, 0.65, 0.42, 0.55)
 const WATER_EDGES: Array = [[Vector2i(-1, 0), Vector2(-16, 0), Vector2(0, -8)], [Vector2i(0, -1), Vector2(0, -8), Vector2(16, 0)], [Vector2i(1, 0), Vector2(16, 0), Vector2(0, 8)], [Vector2i(0, 1), Vector2(0, 8), Vector2(-16, 0)]]
@@ -30,20 +26,6 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	for inlay in inlays: _inlay(inlay)
-	for c in range(cracks.size()):
-		var crack: PackedVector2Array = cracks[c]
-		var tint: Color = crack_tints[c] if c < crack_tints.size() else Color(0.62, 0.42, 0.82)
-		# Lit lower lip (1 px below), dark gap, then the faint glow seeping from inside.
-		var lip: PackedVector2Array = PackedVector2Array()
-		for point in crack: lip.append(point + Vector2(0, 1))
-		draw_polyline(lip, Color(0.5, 0.56, 0.78, 0.18), 1.0)
-		draw_polyline(crack, Color(0.02, 0.02, 0.05, 0.95), 2.0)
-		draw_polyline(crack, Color(tint, 0.26 + sin(time * 1.3 + c) * 0.08), 1.0)
-		for i in range(0, crack.size() - 1, 2):
-			var mid: Vector2 = crack[i].lerp(crack[i + 1], 0.5).round()
-			var branch: Vector2 = Vector2(4 if (i / 2) % 2 else -4, 2)
-			draw_line(mid, mid + branch, Color(0.02, 0.02, 0.05, 0.8), 1.0)
-			draw_line(mid + branch, mid + branch + Vector2(signf(branch.x) * 2.0, 2), Color(0.02, 0.02, 0.05, 0.55), 1.0)
 	for cell: Vector2i in water_cells:
 		var at: Vector2 = IsoMath.cell_to_screen(cell)
 		for edge in WATER_EDGES:

@@ -3,6 +3,7 @@ extends SceneTree
 ##   godot --headless --path . --script tests/iso_smoke_test.gd
 const IsoMath = preload("res://isometric/iso_math.gd")
 const Layout = preload("res://isometric/catacomb_layout.gd")
+const Portal = preload("res://isometric/iso_portal.gd")
 var failures: int = 0
 var checks: int = 0
 var game: Node2D
@@ -209,8 +210,33 @@ func _run() -> void:
 	_check(found.size() == signatures.size(), "Each area shows its architectural signature (%s)" % ", ".join(PackedStringArray(found.keys())))
 	var stubs: int = 0
 	for arch in world.arches:
-		if arch.texture.resource_path.contains("stub"): stubs += 1
-	_check(stubs >= 2 and world.occluders[Vector2i(15, 8)][0].texture.resource_path.ends_with("_key.png"), "Ruined arch in the ash corridor (%d stubs); the entrance gate stays intact" % stubs)
+		if bool(arch.get_meta("portal")["ruined"]): stubs += 1
+	var gate_crown: Dictionary = world.occluders[Vector2i(15, 8)][0].get_meta("portal")
+	_check(stubs >= 2 and not bool(gate_crown["ruined"]) and int(gate_crown["k"]) == 1, "Ruined arch in the ash corridor (%d springers); the entrance gate stays intact" % stubs)
+	# --- arched portals ---------------------------------------------------------
+	var portals_ok: bool = world.portal_posts.size() == 10 and world.portal_cells.size() == 14
+	for passage: Vector2i in world.portal_cells:
+		var info: Array = world.portal_cells[passage]
+		var slices: Array = world.occluders.get(passage, []).filter(func(item: CanvasItem) -> bool: return item.has_meta("portal"))
+		# Every intact passage cell carries its slice of the ring, cut from the portal atlas.
+		if not bool(info[3]) and (slices.is_empty() or not slices[0].texture.resource_path.contains("portal_")): portals_ok = false
+		if not slices.is_empty() and slices[0].get_meta("fade_group").size() < 2: portals_ok = false
+	for post: Vector2i in world.portal_posts:
+		if not world.occluders[post][0].texture.resource_path.contains("portal_"): portals_ok = false
+	_check(portals_ok, "Door posts are portal pylons; every passage cell holds a slice of one continuous ring (fading as a group)")
+	var clears: bool = true
+	for n: int in Portal.SPANS:
+		clears = clears and Portal.clearance(n) >= 36.0 and Portal.rise(n) >= 22.0 and Portal.pylon_top(n) <= Portal.intrados(n, Portal.half_span(n)) + 1.0
+	_check(clears, "Arches clear Kael under every passage cell (>= %.0f px) and crown above their pylons" % Portal.clearance(2))
+	var fitted: bool = true
+	for seal in world.seals:
+		for pane in seal.panes:
+			if pane.tops.size() != 9: fitted = false
+		var info_s: Array = world.portal_cells.get(seal.cells[0], [])
+		if not info_s.is_empty():
+			for j in range(9):
+				if seal.panes[0].tops[j] >= Portal.intrados(int(info_s[1]), j * 2.0): fitted = false
+	_check(fitted, "Seal curtains are fitted under the arch (they fill the opening, never cross the voussoirs)")
 	var torch: PointLight2D = world.lights.flickering[0]
 	var base_energy: float = float(torch.get_meta("base"))
 	var swing: float = 0.0
@@ -218,6 +244,24 @@ func _run() -> void:
 		await process_frame
 		swing = maxf(swing, absf(torch.energy - base_energy) / base_energy)
 	_check(world.lights.flickering.size() >= 10 and world.lights.pulsing.size() >= 6 and world.light_pools.get_child_count() >= 15 and swing <= 0.1, "Light tiers: %d architectural, %d interest, %d floor pools; gentle flicker (max %.0f%%)" % [world.lights.flickering.size(), world.lights.pulsing.size(), world.light_pools.get_child_count(), swing * 100.0])
+	# --- stage 5: prop coherence, wall torches, animated flames ----------------
+	var billboards: int = 0
+	for child in world.depth.get_children():
+		if child is Sprite2D and child.texture and child.texture.resource_path.contains("environments/props"): billboards += 1
+	_check(billboards == 0, "No top-down billboard props left in the isometric scene (%d)" % billboards)
+	var torches_ok: bool = world.wall_torches.size() >= 4
+	for torch_cell: Vector2i in world.wall_torches:
+		var wall: Vector2i = world.wall_torches[torch_cell]
+		torches_ok = torches_ok and world.sconces.has(wall) and world.navigation.is_point_solid(torch_cell) and world.props_by_cell[torch_cell].texture.resource_path.ends_with("marker.png")
+	_check(torches_ok, "%d floor torches moved onto walls as sconces; their cells keep collision and a waystone" % world.wall_torches.size())
+	var first_frames: Array[int] = []
+	for sprite in world.lights.animated: first_frames.append(sprite.frame)
+	for i in range(40): await process_frame
+	var changed: int = 0
+	for i in range(world.lights.animated.size()):
+		if world.lights.animated[i].frame != first_frames[i]: changed += 1
+	_check(world.lights.animated.size() >= 15 and changed > world.lights.animated.size() / 2, "Flames and candles animate (%d sprites, %d changed frame)" % [world.lights.animated.size(), changed])
+	_check(not ("cracks" in world.glow), "Floor fissures are tile-aligned decals, not free-hand strokes")
 	var navigation_same: bool = true
 	for y in range(Layout.size().y):
 		for x in range(Layout.size().x):

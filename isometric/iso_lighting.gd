@@ -24,6 +24,8 @@ var pools: Node2D
 var noise: FastNoiseLite
 var flickering: Array[PointLight2D] = []
 var pulsing: Array[PointLight2D] = []
+## Sprites with frame animation (flames, candles).
+var animated: Array[Sprite2D] = []
 var time: float = 0.0
 
 func _init() -> void:
@@ -71,8 +73,35 @@ func add_pool(at: Vector2, ink: Color, width: float, strength: float) -> Sprite2
 	pools.add_child(pool)
 	return pool
 
+## Animated lunar flame (4-frame strip) as a child of `holder`, its base at `base`
+## (holder-local). Being a child, it sorts and fades together with its wall/brazier.
+func add_flame(holder: Node2D, base: Vector2, large: bool) -> Sprite2D:
+	var flame: Sprite2D = Sprite2D.new()
+	flame.name = "Flame"
+	flame.texture = load("res://assets/isometric/catacombs/%s.png" % ("flame_large" if large else "flame_small"))
+	flame.hframes = 4
+	flame.centered = false
+	var size: Vector2 = Vector2(flame.texture.get_width() / 4.0, flame.texture.get_height())
+	flame.offset = Vector2(-floorf(size.x * 0.5), -size.y)
+	flame.position = base
+	flame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	holder.add_child(flame)
+	animate(flame, 4, 7.0 if large else 8.0)
+	return flame
+
+## Cycles a sprite's frames at `fps`, with a per-sprite phase and slightly irregular
+## timing so neighbouring flames never move in lockstep.
+func animate(sprite: Sprite2D, frames: int, fps: float) -> void:
+	var index: int = animated.size()
+	sprite.set_meta("anim", [frames, fps * (0.85 + float(index * 37 % 30) / 100.0), float(index) * 0.61])
+	animated.append(sprite)
+
 func _process(delta: float) -> void:
 	time += delta
+	for sprite in animated:
+		var anim: Array = sprite.get_meta("anim")
+		var frame: int = int(time * float(anim[1]) + float(anim[2])) % int(anim[0])
+		if sprite.frame != frame: sprite.frame = frame
 	for light in flickering:
 		var phase: float = float(light.get_meta("phase"))
 		# Two octaves of smooth noise: slow breathing plus a gentle shimmer (<= ±9 %).

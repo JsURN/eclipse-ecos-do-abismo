@@ -24,8 +24,9 @@ Roteiro do mapa: Vestíbulo dos Esquecidos → Passagem das Cinzas (corredor com
 ```text
 godot --headless --path . --editor --quit
 godot --headless --path . --script tests/smoke_test.gd       # slice original: 47 checks
-godot --headless --path . --script tests/iso_smoke_test.gd   # protótipo: 72 checks
+godot --headless --path . --script tests/iso_smoke_test.gd   # protótipo: 79 checks
 godot --path . --script tests/iso_capture.gd                 # capturas em artifacts/iso_*.png (precisa de GPU)
+godot --path . --script tests/iso_passage_capture.gd         # passagens/arcos em artifacts/passage_*.png (precisa de GPU)
 ```
 
 Para regenerar o kit de arte: `godot --headless --path . --script tools/build_iso_art.gd` seguido da importação (`--editor --quit`). Os placeholders antigos (`tools/build_iso_placeholders.gd`, `assets/isometric/placeholders/`) ficam só como referência e não são mais carregados.
@@ -233,6 +234,57 @@ godot --path . --script tests/iso_capture.gd                # capturas, inclusiv
 
 As capturas `env_*` (zoom 2×) e `wide_*` (zoom 1×) mostram só o cenário, por região. Os pares antes/depois desta etapa ficaram em `artifacts/stage4/before` e `artifacts/stage4/after` (pasta ignorada pelo Git).
 
+## Coerência de props, arcos, tochas e piso (etapa 5)
+
+Correções de coerência visual, só visuais (colisão, A*, layout, HUD e personagens intactos; testes conferem).
+
+| Problema | Correção |
+| --- | --- |
+| Props herdados do top-down (billboards frontais) | Substituídos por peças isométricas geradas em `tools/build_iso_art.gd`: estátua encapuzada com espada (`statue.png`), altar com disco do eclipse (`altar.png`, elevado sobre o estrado), cristais (`crystal.png`), entulho em blocos (`rubble.png`), braseiro (`brazier.png`). Ossos (`B`) viraram decalque deitado no piso. Nenhum sprite de `assets/environments/props` é usado na cena (teste). |
+| Passagens espremidas (viga reta e grossa) | (Substituído pelos portais da etapa 6.) Arcos em três peças por passagem (`arch_{x,y}_{start,mid,key,end}.png`): intradorso curvo que nasce de uma imposta nova nos batentes (z 34) e sobe até a chave (z 47), aduelas ao longo do anel, viga mais fina. Os tocos de arco desabado das Cinzas continuam. |
+| Tochas de chão e animação fraca | Tochas de chão que não emolduram nada passam para a parede de fundo mais próxima como arandela (`_plan_wall_torches`; ficam no chão só a até 2 células do baú, do altar ou de um batente). A célula antiga recebe um marco de pedra (`marker.png`) e mantém a mesma colisão. Chamas são sobreposições animadas de 4 quadros (`flame_small/large.png`, ~7–8 fps, fase e ritmo diferentes por chama), filhas da parede/braseiro (ordenam e desbotam junto). Arandela mais forte (0,95, raio 2,3) e poça de luz maior no piso à frente. |
+| Linhas escuras aleatórias no piso | Causa: o grão das lajes variava em blocos de 1 unidade da grade, que viravam traços de 2 px e se alinhavam em "rabiscos". Agora o grão é de meia unidade (pontos de 1 px), mais raro e sutil. As fendas desenhadas à mão saíram: as linhas de falha usam decalques de rachadura alinhados às células, com corrupção (Fenda, Câmara) ou fuligem (Cinzas) a cada poucas células. A laje rachada tem uma fissura ao longo da pedra com borda iluminada. |
+| Velas estáticas | `candles.png` com 4 quadros: chamas minúsculas mudam altura, inclinação e brilho; cada grupo com fase própria; luz já cintila suavemente. |
+
+Animação: `iso_lighting.gd` (`add_flame`, `animate`) troca o quadro de ~29 sprites; custo desprezível (2,76 ms por quadro, 462 draw calls, como na etapa 4).
+
+## Portais em arco (etapa 6)
+
+As passagens entre dois batentes `D` foram redesenhadas como **portais**: dois pilares e um anel de aduelas contínuo. Layout, colisões, aberturas e navegação não mudaram (teste).
+
+### Diagnóstico da versão anterior
+
+| Onde | Problema |
+| --- | --- |
+| Geometria da abertura | O arco subia só 13 px num vão de 48 unidades, nascendo em z 34. No 2:1 o lado próximo subia +5 px na tela e o distante caía −21 px: lia-se como uma viga inclinada. |
+| Desenho das peças | Anel de 6 unidades, escuro, quase invisível; o que se lia era o filete dourado do intradorso (um "fio") e as faixas ciano verticais dos batentes. |
+| Composição | Batentes de 13×13×60 px com cubos dourados no topo; o anel parecia apoiado entre torres, não sustentado por elas. |
+| Projeção / ordem | Corretas: o fatiamento por célula já ordenava arco e atores. Mantido. |
+
+### Construção
+
+- **Geometria compartilhada** (`isometric/iso_portal.gd`): imposta em z 22; intradorso semielíptico com flecha entre 22 e 24 (semicírculo em 3 células; arco alteado nas aberturas de 2 células, para não ficar achatado entre os pilares; abatido acima de 3); anel de 7 de espessura radial e 9 de profundidade; topo dos pilares = onde o extradorso deixa a face interna do pilar. O mesmo módulo é usado pelo gerador, pelo mundo e pelos selos.
+- **Arte** (`tools/build_iso_art.gd` → `portal_x.png`, `portal_y.png`): renderizada por *ray casting* de um modelo sólido (caixas para os pilares, elipses para o anel). No espaço do portal o raio de visão é `P0 + t·(1,1,1)` nas duas orientações, então um único renderizador serve às duas. Cada célula da passagem recebe a **fatia** do anel acima dela; as fatias são sprites y-sorted, então o Kael passa sob o arco e atrás dele corretamente.
+  - Pilares: plinto, alvenaria igual à das paredes, faixa de imposta com filete dourado onde o arco nasce, cornija com topo escuro e aresta clara (a convenção das paredes), crescente entalhado. Sem as faixas ciano verticais.
+  - Anel: aduelas em pedra lavrada mais clara que a alvenaria, juntas radiais em número ímpar, aresta externa iluminada, borda interna em sombra, dorso escuro com aresta clara; chave com moldura dourada e crescente lunar.
+  - Variante desabada (Cinzas): os dois arranques ficam, a coroa caiu; a fratura é escalonada (metades interna/externa e frontal/traseira quebram em ângulos diferentes).
+- **Mundo** (`iso_world.gd`): `_plan_portals()` define pilares e fatias; `_portal_piece()` recorta cada peça do atlas (retângulo justo para o fader). As fatias de um anel desbotam juntas (`fade_group`, `iso_occlusion_fader.gd`).
+- **Selos** (`iso_seal.gd`): a cortina segue o intradorso (9 amostras por célula, 2 px abaixo) e preenche a abertura com a forma do arco. O selo da Galeria fica uma célula à frente do arco no layout e também recebe o perfil. O painel ordena 1 px antes da fatia do arco, para que as aduelas da frente o cubram.
+
+### Proporções
+
+| Vão | Flecha | Folga no centro da célula junto ao pilar | Topo dos pilares | Coroa (extradorso) |
+| --- | --- | --- | --- | --- |
+| 2 células | 22 (alteado) | 41 px | 43 | 51 |
+| 3 células | 24 (semicírculo) | 40 px | 42 | 53 |
+| 4 células | 24 (abatido) | 38 px | 40 | 53 |
+
+O Kael tem ~33 px; os pilares ficam na altura das paredes de fundo (40), e o anel sobe 8–11 px acima deles.
+
+### Capturas
+
+`godot --path . --script tests/iso_passage_capture.gd` gera `artifacts/passage_*.png`: as cinco passagens (quatro no eixo y, uma no eixo x), aberta, selada, com o Kael ao lado, atrás e sob o arco. Comparações antes/depois em `artifacts/arches/compare/`.
+
 ## HUD (`isometric/iso_hud.gd`)
 
 O protótipo isométrico tem HUD própria; `hud.gd` (top-down) não foi alterado nesta etapa. Mesma escala da arte (canvas lógico 384×216 em 2×), sem caixas pesadas: painéis que se dissolvem, filetes de ouro velho e losangos lunares.
@@ -263,7 +315,7 @@ Ganchos lidos pela HUD em `iso_prototype.gd`: `objective()`, `action_prompt()`, 
 - **HUD temporária em partes**: retrato reaproveitado do top-down; corrupção é só visual (sistema não implementado); ícones de habilidade desenhados por código; fontes vêm do sistema (Windows: Georgia/Tahoma; em outros sistemas cai em DejaVu/Liberation ou na fonte padrão, também sem antialiasing); uma fonte bitmap própria daria o mesmo resultado em qualquer plataforma.
 - **Rocha à frente das salas**: cortada em altura baixa por legibilidade; não há "teto" ou transição de câmera para áreas cobertas.
 - **Abismo estático**: os terraços são pré-renderizados ao carregar; luzes distantes e névoa de profundidade não animam individualmente (os bancos de névoa sim). Grandes rochas soltas e estruturas inclinadas nas Ruínas ficaram de fora (exigiriam props com colisão ou arte nova).
-- **Props billboard**: estátua, braseiro, altar, cristal e entulho ainda são sprites frontais do top-down, agora mais contrastados com as paredes novas.
+- **Paredes desabadas dentro das salas** (`~`): continuam como blocos de alvenaria; leem como ruína, mas são o elemento mais "blocado" das Ruínas.
 
 ## Assets: substituídos, temporários e definitivos a produzir
 
@@ -284,7 +336,9 @@ Substituições devem manter as dimensões e a base do losango nas **16 linhas i
 
 Os placeholders antigos não são mais carregados (um teste garante); ficam em `assets/isometric/placeholders/` só como referência e podem ser apagados.
 
-Ainda temporários (billboards frontais da slice top-down, aceitáveis mas não isométricos): `statue_sword`, `torch` (braseiro), `altar`, `crystal`, `rubble`, `bones`.
+Os billboards frontais da slice top-down (`statue_sword`, `torch`, `altar`, `crystal`, `rubble`, `bones`) não são mais usados no protótipo (etapa 5); continuam na slice top-down.
+
+Legado das passagens (etapa 6): `door_post.png` só aparece num batente sem par; `lintel_*.png` e `arch_*.png` continuam sendo gerados (reprodutíveis), mas não são mais carregados. Os portais usam `portal_x.png` / `portal_y.png`.
 
 Precisam de arte definitiva (pixel art desenhada à mão, mesmo enquadramento): todo o kit acima (o procedural serve de guia de proporção e paleta), com prioridade para **piso e paredes** (o que mais aparece), **arco/porta** completo, **braseiro isométrico**, **altar** e **estátua** em 3/4; variações de canto de parede e transições piso↔estrado.
 

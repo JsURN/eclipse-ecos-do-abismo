@@ -26,6 +26,8 @@ const LOW_ROW: Dictionary = {"plain": 0, "cracked": 2, "mossy": 3, "broken": 4, 
 
 var world: Node
 var damp: Dictionary = {}
+## Wall cells that must carry a sconce (floor torches moved onto the wall, iso_world.gd).
+var forced: Dictionary = {}
 
 func _init(world_node: Node) -> void:
 	world = world_node
@@ -42,6 +44,10 @@ func full_row(cell: Vector2i) -> int:
 	var right: bool = world.is_floor(cell + Vector2i(1, 0))
 	if below and right: return WALL_ROW["quoin"]
 	var face: int = 0 if below else (1 if right else -1)
+	if forced.has(cell) and face >= 0:
+		world.decorated.append(cell)
+		world.sconces.append(cell)
+		return int(WALL_ROW["sconce"]) + face
 	var facing: Vector2i = Vector2i(0, 1) if face == 0 else (Vector2i(1, 0) if face == 1 else Vector2i(1, 1))
 	var theme: Dictionary = RegionStyle.theme(world.room_name(IsoMath.cell_center(cell + facing)))
 	# Position along the wall run, used for rhythms (bays between pilasters).

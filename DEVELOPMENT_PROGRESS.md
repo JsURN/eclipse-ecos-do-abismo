@@ -182,3 +182,20 @@ Segunda versão da composição visual das Catacumbas, só visual (layout, colis
 - Luz: cintilação por ruído suave (sem a componente rápida), luzes de interesse com pulso lento e poças pontilhadas na cor da assinatura.
 - Desempenho: 2,4 → 2,7 ms por quadro, 411 → 461 draw calls (a versão direta do abismo custava 12,3 ms e foi substituída pela pré-renderizada).
 - Testes: `tests/iso_smoke_test.gd` com 72 checks (abismo afastado dos pisos e graduado, assinatura por área, arco arruinado e entrada intacta, níveis de luz e cintilação suave, grade de navegação idêntica ao layout); suíte original 47/47. `tests/iso_capture.gd` gera vistas sem HUD por região (`env_*`, `wide_*`).
+
+## Etapa 5: coerência de props, arcos, tochas e piso (25/11/2026)
+
+- Props isométricos no lugar dos billboards do top-down: estátua, altar (elevado no estrado), cristais, entulho, braseiro; ossos viraram decalque no piso.
+- Arcos verdadeiros (arranque, coroa e chave com intradorso curvo) apoiados numa imposta nova dos batentes.
+- 5 tochas de chão viraram arandelas de parede (ficam no chão só junto ao baú, ao altar ou a batentes); a célula mantém a colisão com um marco de pedra.
+- Chamas animadas em 4 quadros sobre arandelas e braseiros; velas com 4 quadros; arandelas mais fortes com poça maior.
+- Linhas escuras do piso: grão das lajes corrigido (traços de 2 px viraram pontos de 1 px); fendas desenhadas trocadas por decalques de rachadura alinhados às células; rachadura das lajes ao longo da pedra.
+- Testes: `tests/iso_smoke_test.gd` com 76 checks (sem billboards, tochas movidas com colisão preservada, animação, fendas por decalque); suíte original 47/47. Desempenho igual à etapa 4.
+
+## Etapa 6: portais em arco (25/11/2026)
+
+- Passagens redesenhadas como portais: pilares (antigos batentes) + anel de aduelas semielíptico contínuo, fatiado por célula para manter a ordenação com os atores. Geometria em `isometric/iso_portal.gd` (imposta em z 22, flecha 22–24, anel de 7×9), arte por ray casting em `tools/build_iso_art.gd` → `portal_x.png` / `portal_y.png`.
+- Causa da leitura de "viga": flecha de 13 px num vão de 48 unidades (o cisalhamento 2:1 a inclinava), anel fino e escuro, filete dourado e faixas ciano verticais como únicos elementos legíveis, batentes desproporcionais.
+- Pilares com topo escuro e aresta clara (como as paredes), imposta com filete dourado; aduelas em pedra lavrada mais clara; chave com crescente; arco alteado nas aberturas de 2 células; variante desabada nas Cinzas com a coroa caída.
+- Selos: a cortina preenche a abertura com a forma do arco; as fatias de um anel desbotam juntas.
+- Testes: `tests/iso_smoke_test.gd` com 79 checks; suíte original 47/47. Novo `tests/iso_passage_capture.gd` (capturas das cinco passagens nas duas orientações).

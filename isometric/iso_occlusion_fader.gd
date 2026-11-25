@@ -28,6 +28,10 @@ func _process(delta: float) -> void:
 			for item: CanvasItem in world.occluders.get(base_cell + Vector2i(dx, dy), []):
 				if item.position.y > view.position.y and _rect(item).intersects(silhouette):
 					wanted[item] = true
+	# Slices of one arch ring fade as a whole (no half-transparent seam on the arch).
+	for item: CanvasItem in wanted.keys():
+		if item.has_meta("fade_group"):
+			for other: CanvasItem in item.get_meta("fade_group"): wanted[other] = true
 	for item: CanvasItem in wanted: faded[item] = true
 	for item: CanvasItem in faded.keys():
 		var target: float = FADED_ALPHA if wanted.has(item) else 1.0

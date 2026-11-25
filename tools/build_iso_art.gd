@@ -13,6 +13,9 @@ extends SceneTree
 ## - Floor atlases: 32x32 regions, ground diamond in the BOTTOM 16 rows.
 ## - Blocks: 32 px wide, base diamond centre 8 px above the image bottom.
 const OUT: String = "res://assets/isometric/catacombs/"
+## Shared portal geometry (arched passages): the same numbers place the sprites in
+## iso_world.gd and fit the seal curtains in iso_seal.gd.
+const Portal = preload("res://isometric/iso_portal.gd")
 
 enum { TOP, LEFT, RIGHT, SIDE }
 
@@ -99,6 +102,27 @@ func _initialize() -> void:
 		"lintel_y_stub_a.png": _lintel_stub(false, false),
 		"lintel_y_stub_b.png": _lintel_stub(false, true),
 		"abyss_faces.png": _abyss_faces(),
+		# Stage 5: isometric replacements for the top-down billboards, animated flames,
+		# true arches (curved soffit) in three pieces.
+		"statue.png": _statue(),
+		"altar.png": _altar(),
+		"crystal.png": _crystal(),
+		"rubble.png": _rubble(),
+		"brazier.png": _brazier(),
+		"marker.png": _marker(),
+		"flame_large.png": _flames(10, 14),
+		"flame_small.png": _flames(7, 10),
+		"arch_x_start.png": _arch(true, 0, false),
+		"arch_x_mid.png": _arch(true, 1, false),
+		"arch_x_key.png": _arch(true, 1, true),
+		"arch_x_end.png": _arch(true, 2, false),
+		"arch_y_start.png": _arch(false, 0, false),
+		"arch_y_mid.png": _arch(false, 1, false),
+		"arch_y_key.png": _arch(false, 1, true),
+		"arch_y_end.png": _arch(false, 2, false),
+		# Stage 6: arched portals (pylons + continuous voussoir ring), per orientation.
+		"portal_x.png": _portal_atlas(true),
+		"portal_y.png": _portal_atlas(false),
 	}
 	var failed: bool = false
 	for file: String in jobs:
@@ -237,9 +261,11 @@ func _flagstone(u: float, v: float, layout: int, seed_value: int, bias: float) -
 		# Bevel: back edges catch the light, front edges sink into the joint.
 		if lu < 2.0 or lv < 2.0: ink = _tone(ink, 0.07)
 		elif lu > rect.size.x - 1.5 or lv > rect.size.y - 1.5: ink = _tone(ink, -0.09)
-		var noise: int = _h(int(u), int(v), seed_value * 31 + i)
-		if noise % 19 == 0: ink = _tone(ink, 0.06)
-		elif noise % 11 == 0: ink = _tone(ink, -0.07)
+		# Grain at half-unit resolution: 1 px specks. (Whole-unit blocks projected to 2 px
+		# dashes that lined up into dark scribbles across the floor.)
+		var noise: int = _h(int(u * 2.0), int(v * 2.0), seed_value * 31 + i)
+		if noise % 37 == 0: ink = _tone(ink, 0.04)
+		elif noise % 29 == 0: ink = _tone(ink, -0.04)
 		return ink
 	return JOINT
 
@@ -248,10 +274,13 @@ func _special_floor(column: int, u: float, v: float, x: int, y: int) -> Color:
 	match column:
 		6: # cracked
 			var ink: Color = _flagstone(u, v, 4, 6, -0.01)
-			var crack: float = 2.5 + u * 0.62 + sin(u * 1.15) * 1.4
-			if absf(v - crack) < 0.55: return CRACK
-			if v - crack >= 0.55 and v - crack < 1.4: return _tone(ink, 0.07)
-			if u > 9.0 and absf(v - (2.5 + 9.0 * 0.62 + sin(9.0 * 1.15) * 1.4 - (u - 9.0) * 0.85)) < 0.5: return CRACK
+			# A fissure running along the slab (grid axis, so it follows the stone instead of
+			# standing up like a glyph), gently wavering, with one short branch and a lit lip.
+			var crack: float = 7.5 + sin(u * 0.7 + 0.5) * 1.3
+			if u > 1.5 and u < 14.5:
+				if absf(v - crack) < 0.45: return CRACK
+				if v - crack >= 0.45 and v - crack < 1.1: return _tone(ink, 0.08)
+			if u > 9.0 and u < 12.0 and absf(v - (crack + (u - 9.0) * 1.1)) < 0.45: return CRACK
 			return ink
 		7: # worn: centre polished by footsteps, chipped corner
 			var ink: Color = _flagstone(u, v, 2, 7, 0.0)
@@ -554,9 +583,8 @@ func _wall_decor(kind: String, face: int, s: float, z: float, height: float, see
 			var flame_base: float = 24.0
 			if absf(s - 8.0) < 0.6 and z >= 18.0 and z < 22.0: return IRON
 			if s >= 6.0 and s < 10.0 and z >= 22.0 and z < flame_base: return GOLD_DARK if z >= 23.0 else GOLD_DEEP
-			if z >= flame_base and z < flame_base + 6.0:
-				var spread: float = 2.0 * (1.0 - (z - flame_base) / 6.0) + 0.3
-				if absf(s - 8.0) < spread: return CYAN_GLOW if absf(s - 8.0) < spread * 0.45 and z < flame_base + 4.0 else CYAN
+			# The flame itself is an animated overlay (flame_small.png, iso_lighting.gd); the
+			# wall keeps the cup, the soot mark above it and the glow on the stone.
 			if absf(s - 8.0) < 1.6 and z >= flame_base + 6.0 and z < flame_base + 11.0: return _tone(ink, -0.2)
 			var glow: float = Vector2(s, z).distance_to(Vector2(8, flame_base + 2.0))
 			if glow < 7.5: return ink.lerp(CYAN_DEEP.lightened(0.15), 0.55 * (1.0 - glow / 7.5))
@@ -747,6 +775,10 @@ func _door_post() -> Image:
 		var ink: Color = _tone(WALL_L if face == LEFT else WALL_R, TONES[_h(course, 5, face) % TONES.size()] + 0.03)
 		if absf(s - 5.0) < 2.2 and z > 10.0 and z < 46.0: ink = ink.lerp(CYAN_DEEP, 0.3)
 		return _ao(ink, z))
+	# Impost: the moulded ledge the arch springs from (iso_world.gd arch pieces start at z 34).
+	_box(image, origin, Vector3(2, 2, 32), Vector3(14, 14, 35), func(face: int, u: float, v: float, z: float) -> Color:
+		if face == TOP: return CAP
+		return GOLD_DARK if z >= 34.0 and face == LEFT else _stone(face, u, v, z, 0.08, 13))
 	_box(image, origin, Vector3(2, 2, 50), Vector3(14, 14, 53), func(face: int, _u: float, _v: float, _z: float) -> Color: return _gold(face))
 	_box(image, origin, Vector3(1.5, 1.5, 53), Vector3(14.5, 14.5, 57), func(face: int, u: float, v: float, z: float) -> Color:
 		if face == TOP: return WALL_TOP.lightened(0.05) if u > 2.5 and v > 2.5 and u < 13.5 and v < 13.5 else RIM
@@ -872,20 +904,27 @@ func _pedestal() -> Image:
 				_ink(image, x, y, CYAN_DEEP.lerp(CYAN, light).lerp(CYAN_GLOW, maxf(0.0, light - 0.55) * 2.0))
 	return image
 
+## Votive candles: 4 animation frames side by side (16 px each). Only the tiny flames
+## change (height, lean and brightness), so the cluster flickers without jumping.
 func _candles() -> Image:
-	var image: Image = _blank(16, 14)
-	for y in range(10, 14):
-		for x in range(2, 15):
-			if Vector2((x + 0.5 - 8.5) / 6.0, (y + 0.5 - 12.0) / 1.6).length() < 1.0: _ink(image, x, y, Color(BONE_DARK, 0.85))
-	for candle in [[4, 4], [8, 7], [12, 3]]:
-		var cx: int = candle[0]
-		var tall: int = candle[1]
-		for y in range(12 - tall, 12):
-			_ink(image, cx, y, BONE)
-			_ink(image, cx + 1, y, BONE_DARK)
-		_ink(image, cx, 11 - tall, IRON)
-		_ink(image, cx, 10 - tall, CYAN)
-		_ink(image, cx, 9 - tall, CYAN_GLOW)
+	var image: Image = _blank(64, 14)
+	for frame in range(4):
+		var ox: int = frame * 16
+		for y in range(10, 14):
+			for x in range(2, 15):
+				if Vector2((x + 0.5 - 8.5) / 6.0, (y + 0.5 - 12.0) / 1.6).length() < 1.0: _ink(image, ox + x, y, Color(BONE_DARK, 0.85))
+		for i in range(3):
+			var cx: int = [4, 8, 12][i]
+			var tall: int = [4, 7, 3][i]
+			for y in range(12 - tall, 12):
+				_ink(image, ox + cx, y, BONE)
+				_ink(image, ox + cx + 1, y, BONE_DARK)
+			_ink(image, ox + cx, 11 - tall, IRON)
+			var phase: int = (frame + i * 2) % 4
+			var lean: int = 1 if phase == 3 else 0
+			_ink(image, ox + cx, 10 - tall, CYAN)
+			_ink(image, ox + cx + lean, 9 - tall, CYAN_GLOW if phase != 1 else CYAN)
+			if phase == 0 or phase == 2: _ink(image, ox + cx + lean, 8 - tall, Color(CYAN, 0.7))
 	return image
 
 # --- rock mass ------------------------------------------------------------------------
@@ -1065,3 +1104,447 @@ func _abyss_faces() -> Image:
 				ink = ink.darkened(clampf(float(z) / 96.0, 0.0, 1.0) * 0.75)
 				image.set_pixel(strip * 16 + s, z, ink)
 	return image
+
+# --- stage 5: isometric props, flames and arches ---------------------------------------------
+
+## Lunar flame strip: 4 frames of `width` x `height`, a teardrop that sways and breathes
+## a little (no blinking). Cyan outside, bright core, a dithered translucent rim.
+func _flames(width: int, height: int) -> Image:
+	var image: Image = _blank(width * 4, height)
+	var heights: Array[float] = [1.0, 0.9, 1.04, 0.94]
+	var sways: Array[float] = [0.0, 0.6, -0.2, -0.6]
+	for frame in range(4):
+		var tall: float = (height - 1) * heights[frame]
+		var half: float = width * 0.5 - 0.5
+		for y in range(height):
+			for x in range(width):
+				var t: float = (height - 0.5 - y) / tall
+				if t < 0.0 or t > 1.0: continue
+				var radius: float = half * pow(1.0 - t, 0.65) * minf(1.0, t * 3.0 + 0.45)
+				var dx: float = x + 0.5 - width * 0.5 - sways[frame] * t * 2.0
+				if absf(dx) > radius: continue
+				var ink: Color = CYAN
+				if t < 0.45 and absf(dx) < radius * 0.5: ink = CYAN_GLOW
+				elif absf(dx) > radius - 0.9: ink = Color(CYAN, 0.55 if (x + y + frame) % 2 == 0 else 0.3)
+				_ink(image, frame * width + x, y, ink)
+	return image
+
+## Hooded guardian statue on a plinth, clasping a sword point-down (replaces the
+## front-facing top-down billboard). 32x64, base diamond centre 8 px above the bottom.
+func _statue() -> Image:
+	var image: Image = _blank(32, 64)
+	var origin: Vector2 = Vector2(16, 48)
+	_box(image, origin, Vector3(2, 2, 0), Vector3(14, 14, 5), func(face: int, u: float, v: float, z: float) -> Color:
+		if face == TOP: return CAP
+		var s: float = u if face == LEFT else v
+		if z >= 4.0: return GOLD_DARK if face == LEFT else GOLD_DEEP
+		if face == LEFT and _crescent(s, z, Vector2(8, 2.2), 1.6): return CYAN_DEEP.lightened(0.2)
+		return _ao(_stone(face, u, v, z, 0.03, 81), z + 3.0))
+	# Weathered pale stone, lit from the left like the rest of the kit.
+	var stone := func(face: int, s: float, _t: float, z: float) -> Color:
+		if face == TOP: return Color("4a557f")
+		var lit: Color = Color("6a77a6").lerp(Color("262d4c"), pow((s + 1.0) * 0.5, 0.85))
+		if fmod((asin(clampf(s, -1.0, 1.0)) / PI + 0.5) * 5.0, 1.0) < 0.14 and z < 24.0: lit = _tone(lit, -0.12)
+		return _ao(lit, z - 3.0)
+	_cylinder(image, origin, 8, 8, 4.9, 5, 9, stone)       # hem of the robe
+	_cylinder(image, origin, 8, 8, 4.1, 9, 23, stone)      # robe
+	_cylinder(image, origin, 8, 8, 4.8, 23, 27, stone)     # mantle over the shoulders
+	_cylinder(image, origin, 8, 8, 2.9, 27, 33, func(face: int, s: float, _t: float, z: float) -> Color:
+		if face == TOP: return Color("525e8c")
+		# Small shadowed face under the hood, turned towards the viewer.
+		if s > -0.3 and s < 0.25 and z > 28.5 and z < 31.5: return Color("10131f")
+		return Color("6a77a6").lerp(Color("262d4c"), pow((s + 1.0) * 0.5, 0.85)))
+	_cylinder(image, origin, 8, 8, 1.9, 33, 35, func(face: int, s: float, _t: float, _z: float) -> Color:
+		return Color("5a6797") if face == TOP or s < 0.0 else Color("2c3456"))
+	# Sword held point-down in front of the robe: blade, gilded guard, grip, pommel.
+	var front: Vector2 = origin + Vector2(0, 8) + Vector2(0, 4.1 * sqrt(2.0) * 0.5 + 0.5)
+	for z in range(5, 27):
+		var p: Vector2i = Vector2i(int(front.x), int(front.y - z))
+		if z < 20:
+			_ink(image, p.x - 1, p.y, Color("c4cbe3"))
+			_ink(image, p.x, p.y, Color("7d86a8"))
+		elif z == 20:
+			for dx in range(-3, 3): _ink(image, p.x + dx, p.y, GOLD if dx < 0 else GOLD_DARK)
+		elif z < 24:
+			_ink(image, p.x - 1, p.y, Color("3a2a52"))
+			_ink(image, p.x, p.y, Color("2a1f3d"))
+		else:
+			_ink(image, p.x - 1, p.y, GOLD_LIGHT)
+			_ink(image, p.x, p.y, GOLD)
+	return image
+
+## Ritual altar for the dais: carved block, gilded slab and an eclipse disc on top.
+func _altar() -> Image:
+	var image: Image = _blank(32, 48)
+	var origin: Vector2 = Vector2(16, 32)
+	_box(image, origin, Vector3(2.5, 3.5, 0), Vector3(13.5, 12.5, 9), func(face: int, u: float, v: float, z: float) -> Color:
+		var s: float = u if face == LEFT else v
+		if face == TOP: return CAP
+		if z >= 8.0 or z < 1.0: return GOLD_DARK if face == LEFT else GOLD_DEEP
+		var low: float = 2.5 if face == LEFT else 3.5
+		var high: float = 13.5 if face == LEFT else 12.5
+		if s > low + 1.5 and s < high - 1.5 and z > 2.0 and z < 7.0:
+			if face == LEFT and _crescent(s, z, Vector2((low + high) * 0.5, 4.5), 1.8): return PURPLE_LIGHT
+			return _tone(_stone(face, u, v, z, 0.0, 91), -0.12)
+		return _stone(face, u, v, z, 0.03, 92))
+	_box(image, origin, Vector3(1.5, 2.5, 9), Vector3(14.5, 13.5, 11.5), func(face: int, u: float, v: float, _z: float) -> Color:
+		if face == TOP: return Color("3d4572") if (u > 3.0 and u < 13.0 and v > 4.0 and v < 12.0) else GOLD_DARK
+		return GOLD_DARK if face == LEFT else GOLD_DEEP)
+	# Eclipse disc standing on the slab: dark moon, violet corona, lunar rim.
+	var center: Vector2 = origin + Vector2(0, 8 - 11.5 - 6.5)
+	for y in range(image.get_height()):
+		for x in range(image.get_width()):
+			var p: Vector2 = Vector2(x + 0.5, y + 0.5) - center
+			var d: float = p.length()
+			if d < 6.0 and d >= 4.9: _ink(image, x, y, PURPLE_LIGHT if p.x < 0.0 else PURPLE_MID)
+			elif d < 4.9: _ink(image, x, y, CYAN_GLOW if (p - Vector2(1.4, 0.6)).length() > 4.1 else PURPLE_DEEP)
+	return image
+
+## Cluster of abyssal crystals growing out of a rubble base.
+func _crystal() -> Image:
+	var image: Image = _blank(32, 44)
+	var origin: Vector2 = Vector2(16, 28)
+	var shard := func(face: int, u: float, v: float, z: float) -> Color:
+		if face == TOP: return Color("d9c2ec")
+		var ink: Color = Color("8a6bb5") if face == LEFT else PURPLE_MID
+		var s: float = u if face == LEFT else v
+		if absf(fmod(s + z * 0.35, 3.0) - 1.5) < 0.35: ink = ink.lightened(0.18)
+		return ink.darkened(0.25 * clampf(1.0 - z / 10.0, 0.0, 1.0))
+	_box(image, origin, Vector3(3, 4, 0), Vector3(13, 13, 2), func(face: int, u: float, v: float, z: float) -> Color: return _stone(face, u, v, z, -0.05, 61))
+	_box(image, origin, Vector3(9, 4.5, 0), Vector3(12, 7.5, 9), shard)
+	_box(image, origin, Vector3(4, 10, 0), Vector3(6.5, 12.5, 7), shard)
+	_box(image, origin, Vector3(6, 6, 0), Vector3(10, 10, 15), shard)
+	_box(image, origin, Vector3(7, 7, 15), Vector3(9, 9, 19), shard)
+	_box(image, origin, Vector3(9.8, 5.3, 9), Vector3(11.2, 6.7, 11), shard)
+	return image
+
+## Pile of fallen masonry chunks, built from real isometric boxes.
+func _rubble() -> Image:
+	var image: Image = _blank(32, 32)
+	var origin: Vector2 = Vector2(16, 16)
+	var chunks: Array = [
+		[Vector3(2, 4, 0), Vector3(7, 9, 4)], [Vector3(8, 2, 0), Vector3(12.5, 6.5, 3)],
+		[Vector3(9, 9, 0), Vector3(14, 13.5, 2.5)], [Vector3(5, 9, 0), Vector3(9.5, 13.5, 5)],
+		[Vector3(6, 5, 4), Vector3(9.5, 8.5, 7)],
+	]
+	for i in range(chunks.size()):
+		_box(image, origin, chunks[i][0], chunks[i][1], func(face: int, u: float, v: float, z: float) -> Color:
+			var ink: Color = _stone(face, u, v, z, 0.04 if face == TOP else 0.0, 70 + i)
+			if face != TOP and absf(z - 2.0) < 0.5 and (i % 2) == 0: ink = MORTAR
+			return ink)
+	return image
+
+## Iron brazier on a stone foot (for the floor torches that remain); flame is an overlay.
+func _brazier() -> Image:
+	var image: Image = _blank(32, 40)
+	var origin: Vector2 = Vector2(16, 24)
+	_box(image, origin, Vector3(4.5, 4.5, 0), Vector3(11.5, 11.5, 3), func(face: int, u: float, v: float, z: float) -> Color:
+		return _ao(_stone(face, u, v, z, 0.02, 101), z + 4.0))
+	_cylinder(image, origin, 8, 8, 1.2, 3, 13, func(_face: int, s: float, _t: float, _z: float) -> Color:
+		return IRON.lightened(0.15) if s < 0.0 else IRON)
+	_cylinder(image, origin, 8, 8, 3.8, 13, 17, func(face: int, s: float, _t: float, z: float) -> Color:
+		if face == TOP: return CYAN_DEEP.lightened(0.2)
+		if z >= 16.0: return GOLD_DARK if s < 0.2 else GOLD_DEEP
+		return Color("2a2f45").lerp(IRON, (s + 1.0) * 0.5))
+	return image
+
+## Low carved waystone with a lunar mark. It stands where a floor torch was moved onto
+## the nearby wall, so the cell keeps a visible object for its unchanged collision.
+func _marker() -> Image:
+	var image: Image = _blank(32, 32)
+	var origin: Vector2 = Vector2(16, 16)
+	_box(image, origin, Vector3(4.5, 4.5, 0), Vector3(11.5, 11.5, 2), func(face: int, u: float, v: float, z: float) -> Color:
+		return _ao(_stone(face, u, v, z, -0.03, 111), z + 4.0))
+	_box(image, origin, Vector3(5.5, 5.5, 2), Vector3(10.5, 10.5, 12), func(face: int, u: float, v: float, z: float) -> Color:
+		if face == TOP: return CAP
+		var s: float = u if face == LEFT else v
+		if face == LEFT and _crescent(s, z, Vector2(8, 8), 1.8): return CYAN_DEEP.lightened(0.2)
+		if z >= 11.0: return _tone(_stone(face, u, v, z, 0.1, 112), 0.05)
+		return _stone(face, u, v, z, 0.03, 112))
+	return image
+
+## One cell of a true arch over a passage. piece: 0 = springing next to the low post,
+## 1 = crown (the keystone variant carries the crescent), 2 = springing next to the high
+## post. The soffit curves from the post impost (z 34) up to the crown (z 47), so the
+## opening reads as an arch instead of a heavy beam; voussoir joints follow the ring.
+func _arch(along_x: bool, piece: int, keystone: bool) -> Image:
+	var image: Image = _blank(32, 74)
+	var origin: Vector2 = Vector2(16, 58)
+	var lo: Vector3 = Vector3(0, 5, 34) if along_x else Vector3(5, 0, 34)
+	var hi: Vector3 = Vector3(16, 11, 55) if along_x else Vector3(11, 16, 55)
+	_box(image, origin, lo, hi, func(face: int, u: float, v: float, z: float) -> Color:
+		var along: float = u if along_x else v
+		var t: float = along / 16.0
+		var soffit: float = 47.0
+		if piece == 0: soffit = 34.0 + 13.0 * sin(t * PI * 0.5)
+		elif piece == 2: soffit = 34.0 + 13.0 * cos(t * PI * 0.5)
+		if z < soffit: return Color.TRANSPARENT
+		if face == TOP:
+			var across: float = (v - lo.y) if along_x else (u - lo.x)
+			return RIM.darkened(0.2) if across < 1.0 or across >= 5.0 else WALL_TOP.lightened(0.04)
+		var long_face: bool = (face == LEFT) == along_x
+		var base: Color = WALL_L if face == LEFT else WALL_R
+		if z < soffit + 1.0: return GOLD_DARK if face == LEFT else GOLD_DEEP
+		if z >= 53.0: return _tone(base, 0.16)
+		if z >= 52.0: return MORTAR
+		if long_face:
+			if keystone and absf(along - 8.0) < 2.6 and z < soffit + 7.0:
+				if _crescent(along, z, Vector2(8, soffit + 3.5), 1.9): return CYAN
+				return GOLD_DEEP if absf(along - 8.0) > 2.0 else Color("2a2f52")
+			if z < soffit + 6.0 and fmod(along + 2.0, 4.0) < 0.7: return MORTAR
+			if absf(z - (soffit + 6.0)) < 0.5: return MORTAR
+		return _tone(base, 0.06 + TONES[_h(int(along / 4.0), int(z / 6.0), 23 + piece) % TONES.size()]))
+	return image
+
+# --- stage 6: arched portals --------------------------------------------------------------
+
+## Arched portals (a passage between two door posts), rendered by ray casting a small
+## solid model so the arch is ONE continuous shape across its per-cell slices (each
+## slice is a y-sorted sprite, which keeps actors correctly in front of / under it):
+##   pylons    the door posts: plinth, ashlar body, impost band with a gold line where
+##             the arch springs, cornice meeting the ring's extrados, carved crescent;
+##   ring      semi-elliptical voussoir ring (iso_portal.gd) almost as deep as the
+##             pylons: radial joints, a lit outer edge and a gilded inner edge;
+##   keystone  proud of the ring, gold frame and lunar crescent.
+## Collapsed variant: same pylons, each springer keeps a few voussoirs, broken off in
+## staggered steps. In portal space the view ray is P0 + t (1, 1, 1) for BOTH
+## orientations (s, c are just u, v swapped), so a single renderer serves both.
+func _portal_atlas(along_x: bool) -> Image:
+	var size: Vector2i = Portal.CELL_SIZE
+	var image: Image = _blank((Portal.SPANS.max() + 2) * size.x, Portal.SPANS.size() * 2 * size.y)
+	for n: int in Portal.SPANS:
+		for ruined: bool in [false, true]:
+			var parts: Array = _portal_parts(n, ruined)
+			for k in range(-1, n + 1):
+				var cell: Image = _blank(size.x, size.y)
+				_portal_cell(cell, along_x, n, k, parts)
+				image.blit_rect(cell, Rect2i(Vector2i.ZERO, size), Portal.region(n, k, ruined).position)
+	return image
+
+## Solid model of one portal in portal space (s along the span, c across, z up).
+func _portal_parts(n: int, ruined: bool) -> Array:
+	var w: float = 16.0 * n
+	var top: float = Portal.pylon_top(n)
+	var spring: float = Portal.SPRING
+	var parts: Array = []
+	for side in range(2):
+		var lo_s: float = -16.0 if side == 0 else w
+		var hi_s: float = 0.0 if side == 0 else w + 16.0
+		# [material, reach into the opening, c range, z range]
+		for spec: Array in [
+			["plinth", 0.6, Vector2(0.8, 15.2), Vector2(0.0, 3.0)],
+			["pylon", 0.0, Portal.PYLON_C, Vector2(0.0, top - 3.0)],
+			["impost", 0.8, Vector2(0.8, 15.2), Vector2(spring - 2.5, spring)],
+			["cornice", 0.6, Vector2(0.8, 15.2), Vector2(top - 3.0, top)],
+		]:
+			var reach: float = float(spec[1])
+			var c: Vector2 = spec[2]
+			var z: Vector2 = spec[3]
+			var a: float = lo_s - (reach if side == 1 else 0.0)
+			var b: float = hi_s + (reach if side == 0 else 0.0)
+			parts.append({"box": true, "lo": Vector3(a, c.x, z.x), "hi": Vector3(b, c.y, z.y), "mat": spec[0], "side": side})
+	if not ruined:
+		parts.append({"box": false, "f": Vector2(0.0, 1.0), "c": Portal.RING_C, "wedges": [], "mat": "ring"})
+		var middle: float = Portal.half_span(n)
+		var crown: float = spring + Portal.rise(n)
+		parts.append({"box": true, "lo": Vector3(middle - 3.0, Portal.RING_C.x, crown - 1.0), "hi": Vector3(middle + 3.0, Portal.RING_C.y + 0.6, crown + Portal.RING + 1.5), "mat": "keystone", "side": -1})
+		return parts
+	# Collapsed: only the crown fell. Inner/outer halves of the ring and its front/back
+	# halves break at staggered angles, so each springer ends in a stepped fracture.
+	for band in range(2):
+		for half in range(2):
+			var f: Vector2 = Vector2(0.0, 0.5) if band == 0 else Vector2(0.5, 1.0)
+			var cr: Vector2 = Vector2(Portal.RING_C.x, 8.0) if half == 0 else Vector2(8.0, Portal.RING_C.y)
+			var low: float = deg_to_rad([101.0, 96.0, 108.0, 101.0][band * 2 + half])
+			var high: float = deg_to_rad([79.0, 85.0, 72.0, 79.0][band * 2 + half])
+			parts.append({"box": false, "f": f, "c": cr, "wedges": [[low, true]], "mat": "ring"})
+			parts.append({"box": false, "f": f, "c": cr, "wedges": [[high, false]], "mat": "ring"})
+	return parts
+
+## Renders piece k of the portal (k = -1 low pylon, 0..n-1 passage cells, n high pylon)
+## into a 32x96 cell whose base diamond centre is 8 px above the bottom.
+func _portal_cell(image: Image, along_x: bool, n: int, k: int, parts: Array) -> void:
+	var s_lo: float = 16.0 * k
+	var origin: Vector2 = Vector2(16, Portal.CELL_SIZE.y - 16)
+	for y in range(image.get_height()):
+		for x in range(image.get_width()):
+			var a: float = x + 0.5 - origin.x
+			var b: float = y + 0.5 - origin.y
+			# Ray of this pixel: (u, v, z) = (t + a, t, t + a/2 - b) in the cell.
+			var p0: Vector3 = Vector3(a + s_lo, 0.0, a * 0.5 - b) if along_x else Vector3(s_lo, a, a * 0.5 - b)
+			var best_t: float = -INF
+			var best_part: Dictionary = {}
+			var best_face: String = ""
+			for part: Dictionary in parts:
+				var hit: Array = _portal_box_hit(part, p0, s_lo) if part["box"] else _portal_ring_hit(part, p0, s_lo, n)
+				if not hit.is_empty() and float(hit[0]) > best_t:
+					best_t = hit[0]
+					best_part = part
+					best_face = hit[1]
+			if not best_part.is_empty():
+				_ink(image, x, y, _portal_shade(best_part, best_face, p0 + Vector3.ONE * best_t, along_x, n))
+
+## Nearest-to-viewer point of an axis-aligned box clipped to the cell column, and the
+## face it lies on ("top", "front" = +c, "side" = +s, "cut" = slice boundary).
+func _portal_box_hit(part: Dictionary, p0: Vector3, s_lo: float) -> Array:
+	var lo: Vector3 = part["lo"]
+	var hi: Vector3 = part["hi"]
+	var hi_s: float = minf(hi.x, s_lo + 16.0)
+	var hi_c: float = minf(hi.y, 16.0)
+	# A box clipped to nothing by the slice would leave a zero-thickness plane.
+	if hi_s <= maxf(lo.x, s_lo) or hi_c <= maxf(lo.y, 0.0): return []
+	var t_in: float = maxf(maxf(maxf(lo.x, s_lo) - p0.x, maxf(lo.y, 0.0) - p0.y), lo.z - p0.z)
+	var ts: float = hi_s - p0.x
+	var tc: float = hi_c - p0.y
+	var tz: float = hi.z - p0.z
+	var t_out: float = minf(minf(ts, tc), tz)
+	if t_out < t_in: return []
+	if t_out == tz: return [t_out, "top"]
+	if t_out == tc: return [t_out, "front"]
+	return [t_out, "cut" if hi_s < hi.x else "side"]
+
+## Same for the voussoir ring: the band between two ellipses above the impost, its
+## c range, the cell column and (collapsed ring) angular wedges.
+func _portal_ring_hit(part: Dictionary, p0: Vector3, s_lo: float, n: int) -> Array:
+	var a: float = Portal.half_span(n)
+	var bv: float = Portal.rise(n)
+	var depth: float = Portal.RING
+	var f: Vector2 = part["f"]
+	var c: Vector2 = part["c"]
+	var sx: float = p0.x - a
+	var zr: float = p0.z - Portal.SPRING
+	var lo_t: float = maxf(maxf(-zr, c.x - p0.y), s_lo - p0.x)
+	var hi_t: float = c.y - p0.y
+	var face: String = "front"
+	var ts: float = s_lo + 16.0 - p0.x
+	if ts < hi_t:
+		hi_t = ts
+		face = "cut"
+	# Wedge: keep the polar angle >= limit (low springer) or <= limit (high springer),
+	# measured on the mid ellipse; linear in t, so it is just one more bound.
+	var a_ref: float = a + depth * 0.5
+	var b_ref: float = bv + depth * 0.5
+	for wedge: Array in part["wedges"]:
+		var th: float = wedge[0]
+		var k1: float = cos(th) / b_ref - sin(th) / a_ref
+		var k0: float = cos(th) * zr / b_ref - sin(th) * sx / a_ref
+		if not wedge[1]:
+			k1 = -k1
+			k0 = -k0
+		if absf(k1) < 0.000001:
+			if k0 < 0.0: return []
+		elif k1 > 0.0:
+			lo_t = maxf(lo_t, -k0 / k1)
+		elif -k0 / k1 < hi_t:
+			hi_t = -k0 / k1
+			face = "break"
+	var outer: Array = _ellipse_span(sx, zr, a + depth * f.y, bv + depth * f.y)
+	if outer.is_empty(): return []
+	if float(outer[1]) < hi_t:
+		hi_t = outer[1]
+		face = "extrados" if f.y >= 1.0 else "break"
+	lo_t = maxf(lo_t, outer[0])
+	if hi_t < lo_t: return []
+	var inner: Array = _ellipse_span(sx, zr, a + depth * f.x, bv + depth * f.x)
+	if not inner.is_empty() and float(inner[0]) < hi_t and hi_t < float(inner[1]):
+		hi_t = inner[0]
+		face = "intrados" if f.x <= 0.0 else "break"
+		if hi_t < lo_t: return []
+	return [hi_t, face]
+
+## t interval where the ray (sx + t, zr + t) is inside the ellipse with semi-axes
+## (ea, eb) centred on the origin; [] when it misses.
+static func _ellipse_span(sx: float, zr: float, ea: float, eb: float) -> Array:
+	var qa: float = 1.0 / (ea * ea) + 1.0 / (eb * eb)
+	var qb: float = 2.0 * (sx / (ea * ea) + zr / (eb * eb))
+	var qc: float = sx * sx / (ea * ea) + zr * zr / (eb * eb) - 1.0
+	var disc: float = qb * qb - 4.0 * qa * qc
+	if disc < 0.0: return []
+	var root: float = sqrt(disc)
+	return [(-qb - root) / (2.0 * qa), (-qb + root) / (2.0 * qa)]
+
+func _portal_shade(part: Dictionary, face: String, p: Vector3, along_x: bool, n: int) -> Color:
+	# +c is the face turned to the viewer across the passage, +s the one along it.
+	var lit_s: Color = WALL_R if along_x else WALL_L
+	var lit_c: Color = WALL_L if along_x else WALL_R
+	var lit: Color = lit_c if face == "front" else lit_s
+	var left: bool = (face == "front") == along_x
+	var gold: Color = GOLD_DARK if left else GOLD_DEEP
+	var top: float = Portal.pylon_top(n)
+	match String(part["mat"]):
+		"plinth":
+			if face == "top": return CAP.darkened(0.3)
+			return _ao(_tone(lit, -0.12), p.z + 2.0)
+		"pylon":
+			if face == "top": return WALL_TOP
+			var along: float = fposmod(p.x, 16.0) if face == "front" else p.y
+			if face == "front" and _crescent(along, p.z, Vector2(8.0, 12.5), 2.6): return CYAN_DEEP.lightened(0.18)
+			var stone: Color = _masonry(along, p.z, top - 3.0, 140 + int(part["side"]) * 7 + (0 if face == "front" else 3), lit)
+			return stone.darkened(0.3) if face == "cut" else stone
+		"impost":
+			if face == "top": return CAP.darkened(0.2)
+			if p.z >= Portal.SPRING - 0.8: return gold
+			return _tone(lit, 0.1 if p.z >= Portal.SPRING - 2.0 else 0.02)
+		"cornice":
+			# Same reading as the wall tops: dark top, light rim on the visible edges.
+			if face == "top":
+				var lo: Vector3 = part["lo"]
+				var hi: Vector3 = part["hi"]
+				if p.y >= hi.y - 0.8: return RIM
+				if p.x >= hi.x - 0.8: return RIM.darkened(0.12)
+				if p.y < lo.y + 0.8 or p.x < lo.x + 0.8: return RIM.darkened(0.42)
+				return WALL_TOP.lightened(0.05) if _h(int(p.x * 1.5), int(p.y * 1.5), 7) % 11 == 0 else WALL_TOP
+			if p.z >= top - 0.8: return _tone(lit, 0.22)
+			return _tone(lit, 0.1)
+		"keystone":
+			if face == "top": return RIM if p.y >= Portal.RING_C.y - 0.2 else WALL_TOP.lightened(0.1)
+			if face != "front": return _tone(lit, 0.12)
+			var middle: float = Portal.half_span(n)
+			var crown: float = Portal.SPRING + Portal.rise(n)
+			var lx: float = p.x - (middle - 3.0)
+			if lx < 0.8 or lx > 5.2 or p.z < crown - 0.2 or p.z > crown + Portal.RING + 1.2: return gold
+			if _crescent(p.x - middle, p.z - (crown + Portal.RING * 0.5 + 0.5), Vector2.ZERO, 2.3): return CYAN
+			return Color("2a2f52")
+	return _portal_ring_shade(face, p, lit, lit_s, gold, n)
+
+## Voussoirs: radial joints at an odd count (a stone at the crown), a lit outer edge
+## and a gilded inner edge on the face, lighter stone on the back of the ring.
+func _portal_ring_shade(face: String, p: Vector3, lit: Color, lit_s: Color, _gold: Color, n: int) -> Color:
+	var a: float = Portal.half_span(n)
+	var bv: float = Portal.rise(n)
+	var dx: float = p.x - a
+	var dz: float = maxf(0.0, p.z - Portal.SPRING)
+	var angle: float = atan2(dz / (bv + Portal.RING * 0.5), dx / (a + Portal.RING * 0.5))
+	var arc: float = PI * (a + bv + Portal.RING) * 0.5
+	var count: int = 2 * int(round(arc / 13.0)) + 1
+	var slot: float = angle / PI * count
+	var joint: float = minf(fposmod(slot, 1.0), 1.0 - fposmod(slot, 1.0)) * arc / count
+	var stone_tone: float = TONES[_h(int(slot), 17, n) % TONES.size()]
+	var direction: float = atan2(dz, dx)
+	var inner: float = 1.0 / sqrt(pow(cos(direction) / a, 2.0) + pow(sin(direction) / bv, 2.0))
+	var radial: float = clampf((Vector2(dx, dz).length() - inner) / Portal.RING, 0.0, 1.0)
+	# Dressed stone, paler than the rough ashlar of the walls: the arch frames the way.
+	var dressed: Color = Color("4b5684") if lit == WALL_L else Color("353f69")
+	match face:
+		"front":
+			# The voussoir band is the element that must read: dressed stone, dark joints,
+			# a lit outer edge and a shadowed inner edge (no gilded wire under it).
+			if radial > 0.84: return dressed.lightened(0.16)
+			if radial < 0.13: return _tone(lit, -0.2)
+			if joint < 0.6: return MORTAR
+			return _tone(dressed, stone_tone)
+		"extrados":
+			# Back of the ring: a dark top like the walls', rimmed where it meets the face.
+			if p.y >= Portal.RING_C.y - 1.6: return RIM
+			if p.y < Portal.RING_C.x + 0.8: return RIM.darkened(0.42)
+			var back: Color = WALL_TOP.lerp(lit_s.darkened(0.2), 1.0 - clampf(sin(direction), 0.0, 1.0))
+			return back.darkened(0.25) if joint < 0.5 else _tone(back, stone_tone * 0.4)
+		"intrados":
+			var under: Color = lit_s.darkened(0.2 + 0.4 * clampf(sin(direction), 0.0, 1.0))
+			return under.darkened(0.25) if joint < 0.5 else under
+		"cut":
+			return lit.darkened(0.3)
+	# Fracture of the collapsed ring: rough, chipped stone.
+	var grain: int = _h(int(p.x * 2.0), int(p.z * 2.0) + int(p.y), 151)
+	if grain % 11 == 0: return CRACK
+	return Color("2b3150") if grain % 3 else Color("1a1f36")
