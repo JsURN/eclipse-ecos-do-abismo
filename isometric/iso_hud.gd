@@ -34,12 +34,16 @@ const MAP_FRAME: Rect2 = Rect2(318, 4, 62, 40)
 const MAP_ORIGIN: Vector2 = Vector2(320, 6)
 const REVEAL_RADIUS: int = 6
 const XP_WIDTH: float = 45.0
+## The HUD Control is scaled 2x (logical 384x216 -> 768x432 viewport); text is
+## rasterized at this factor so glyphs are never magnified.
+const TEXT_OVERSAMPLE: int = 2
 const HINT_SECONDS: float = 14.0
 const HINTS: Array = [["WASD", "mover"], ["Mouse", "mirar"], ["J", "atacar"], ["Shift", "esquivar"], ["E", "interagir"]]
 
 var game: Node
 var title_font: Font
 var body_font: Font
+var label_font: Font
 var time: float = 0.0
 var health_display: float = 1.0
 var last_health: float = -1.0
@@ -62,15 +66,34 @@ var reveal_timer: float = 0.0
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	body_font = ThemeDB.fallback_font
-	# Serif titles from the system (no bundled font = no new dependency); falls back
-	# to the default font where none of these exist.
-	var serif: SystemFont = SystemFont.new()
-	serif.font_names = PackedStringArray(["Cinzel", "Trajan Pro", "Palatino Linotype", "Book Antiqua", "Georgia", "Cambria", "Times New Roman", "serif"])
-	serif.font_weight = 600
-	serif.fallbacks = [body_font]
-	title_font = serif
+	# Text is rasterized at the viewport's native resolution (see _text) with no
+	# antialiasing and full hinting, so every glyph pixel lands on the 2x2 screen grid
+	# like the rest of the pixel art. System fonts keep the project free of font files;
+	# hinted Tahoma/Verdana and Georgia/Palatino render cleanly unantialiased.
+	var fallback: Font = ThemeDB.fallback_font
+	if fallback is FontFile:
+		fallback = fallback.duplicate()
+		_make_crisp(fallback)
+	body_font = _system_font(["Tahoma", "Verdana", "DejaVu Sans", "Liberation Sans", "sans-serif"], 400, fallback)
+	# Small labels (6-7 logical units) use the bold cut: 2 px stems stay readable.
+	label_font = _system_font(["Tahoma", "Verdana", "DejaVu Sans", "Liberation Sans", "sans-serif"], 700, body_font)
+	title_font = _system_font(["Georgia", "Palatino Linotype", "Book Antiqua", "Cambria", "DejaVu Serif", "serif"], 700, body_font)
 	_prepare_map()
+
+static func _system_font(names: Array, weight: int, fallback: Font) -> SystemFont:
+	var font: SystemFont = SystemFont.new()
+	font.font_names = PackedStringArray(names)
+	font.font_weight = weight
+	font.fallbacks = [fallback]
+	_make_crisp(font)
+	return font
+
+static func _make_crisp(font: Font) -> void:
+	font.set("antialiasing", TextServer.FONT_ANTIALIASING_NONE)
+	font.set("hinting", TextServer.HINTING_NORMAL)
+	font.set("subpixel_positioning", TextServer.SUBPIXEL_POSITIONING_DISABLED)
+	font.set("multichannel_signed_distance_field", false)
+	font.set("generate_mipmaps", false)
 
 # --- state ------------------------------------------------------------------------
 
@@ -172,18 +195,33 @@ func _rebuild_map() -> void:
 	map_texture.update(map_image)
 
 func _texel(cell: Vector2i, ink: Color) -> void:
+	# 2x2 texels per cell: the 2:1 projection of neighbouring cells then tiles solidly
+	# instead of leaving a checkerboard of holes.
 	var at: Vector2i = Vector2i(_map_texel(Vector2(cell)).floor())
-	for x in range(2):
-		if Rect2i(Vector2i.ZERO, MAP_PIXELS).has_point(at + Vector2i(x, 0)): map_image.set_pixelv(at + Vector2i(x, 0), ink)
+	for y in range(2):
+		for x in range(2):
+			var texel: Vector2i = at + Vector2i(x, y)
+			if Rect2i(Vector2i.ZERO, MAP_PIXELS).has_point(texel): map_image.set_pixelv(texel, ink)
 
 # --- drawing helpers -------------------------------------------------------------------
 
+## Draws text at NATIVE viewport resolution: the HUD is scaled 2x, so text is drawn
+## under a 0.5 transform at twice the size, at whole viewport pixels. Sizes stay in
+## logical units (6 -> 12 px glyphs). A 1 px outline plus a hard drop shadow gives
+## contrast on busy floors without the smeared look of a thick outline.
 func _text(font: Font, at: Vector2, text: String, size: int, ink: Color, align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT, width: float = -1.0) -> void:
-	draw_string_outline(font, at, text, align, width, size, 2, Color(SHADE, ink.a * 0.9))
-	draw_string(font, at, text, align, width, size, ink)
+	var px: int = size * TEXT_OVERSAMPLE
+	var pos: Vector2 = (at * TEXT_OVERSAMPLE).round()
+	var box: float = width * TEXT_OVERSAMPLE if width > 0.0 else -1.0
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE / TEXT_OVERSAMPLE)
+	draw_string(font, pos + Vector2(1, 1), text, align, box, px, Color(SHADE, ink.a))
+	draw_string_outline(font, pos, text, align, box, px, 2, Color(SHADE, ink.a * 0.8))
+	draw_string(font, pos, text, align, box, px, ink)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
+## Width in logical units of text drawn by _text.
 func _text_width(font: Font, text: String, size: int) -> float:
-	return font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	return font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size * TEXT_OVERSAMPLE).x / TEXT_OVERSAMPLE
 
 func _centered(font: Font, center_x: float, baseline: float, text: String, size: int, ink: Color) -> float:
 	var width: float = _text_width(font, text, size)
@@ -217,12 +255,12 @@ func _band(center: Vector2, half_width: float, half_height: float, alpha: float)
 		draw_polygon(PackedVector2Array([center + Vector2(0, -half_height), center + Vector2(side * half_width, -half_height), center + Vector2(side * half_width, half_height), center + Vector2(0, half_height)]), PackedColorArray([dark, clear, clear, dark]))
 
 func _keycap(at: Vector2, key: String, ink: Color, size: int = 7) -> float:
-	var width: float = maxf(9.0, _text_width(body_font, key, size) + 5.0)
+	var width: float = maxf(9.0, _text_width(label_font, key, size) + 5.0)
 	var rect: Rect2 = Rect2(at, Vector2(width, 10))
 	draw_rect(rect, Color(SHADE, 0.85 * ink.a))
 	draw_rect(rect, Color(ink, 0.85 * ink.a), false, 1.0)
 	draw_line(rect.position + Vector2(1, 9), rect.position + Vector2(width - 1, 9), Color(ink, 0.35 * ink.a))
-	_text(body_font, Vector2(at.x + width * 0.5 - _text_width(body_font, key, size) * 0.5, at.y + 7.5), key, size, ink)
+	_text(label_font, Vector2(at.x + width * 0.5 - _text_width(label_font, key, size) * 0.5, at.y + 7.5), key, size, ink)
 	return width
 
 # --- draw --------------------------------------------------------------------------------
@@ -272,10 +310,10 @@ func _draw_player(p: Node) -> void:
 	var gem: Vector2 = Vector2(31, 31)
 	_diamond(gem, 6.5, Color("2a1f3d"), GOLD)
 	_diamond(gem, 4.5, Color.TRANSPARENT, Color(PURPLE_LIGHT, 0.35))
-	_centered(body_font, gem.x + 0.5, gem.y + 2.5, str(int(p.level)), 7, PARCHMENT)
+	_centered(label_font, gem.x + 0.5, gem.y + 2.5, str(int(p.level)), 7, PARCHMENT)
 	# Name and health numbers.
 	_text(title_font, Vector2(40, 11), "Kael", 9, GOLD)
-	_text(body_font, Vector2(70, 11), "%d / %d" % [int(ceilf(float(p.health))), int(p.max_health)], 7, PARCHMENT, HORIZONTAL_ALIGNMENT_RIGHT, 52)
+	_text(label_font, Vector2(70, 11), "%d / %d" % [int(ceilf(float(p.health))), int(p.max_health)], 7, PARCHMENT, HORIZONTAL_ALIGNMENT_RIGHT, 52)
 	# Health: slanted bar, delayed chip, quarter ticks, flash on hit, pulse when low.
 	var ratio: float = float(p.health) / float(p.max_health)
 	draw_colored_polygon(_slant(39, 13, 84, 8), Color(SHADE, 0.92))
@@ -290,14 +328,14 @@ func _draw_player(p: Node) -> void:
 	draw_polyline(outline, GOLD_DEEP, 1.0)
 	# Echoes (experience): label column at x=40 and content column at x=78, like corruption.
 	var xp: float = clampf(float(p.experience) / float(p.experience_to_next), 0.0, 1.0)
-	_text(body_font, Vector2(40, 28), "ecos", 6, Color(CYAN, 0.8))
+	_text(label_font, Vector2(40, 28), "ecos", 6, Color("8fe6e2"))
 	draw_rect(Rect2(78, 24, XP_WIDTH, 3), Color(SHADE, 0.92))
 	draw_rect(Rect2(78, 24, floorf(XP_WIDTH * xp), 3), CYAN_DEEP.lerp(CYAN, 0.75))
 	if xp > 0.0: draw_line(Vector2(78, 24.5), Vector2(78 + floorf(XP_WIDTH * xp), 24.5), Color("c9fbf3"))
 	draw_rect(Rect2(77, 23, XP_WIDTH + 2, 5), Color(CYAN_DEEP, 0.6), false, 1.0)
 	# Corruption (reserved system): five empty sigils until it is implemented.
 	var corruption: float = float(p.get("corruption")) if p.get("corruption") != null else 0.0
-	_text(body_font, Vector2(40, 35), "corrupção", 6, Color(PURPLE_LIGHT, 0.7))
+	_text(label_font, Vector2(40, 35), "corrupção", 6, Color("c6a7dc"))
 	for i in range(5):
 		var lit: bool = corruption > i * 20.0
 		_diamond(Vector2(80 + i * 7, 32.5), 2.5, PURPLE_LIGHT if lit else Color(PURPLE, 0.4), Color(PURPLE_LIGHT, 0.55))
@@ -309,6 +347,8 @@ static func _slant(x: float, y: float, width: float, height: float) -> PackedVec
 func _draw_area() -> void:
 	# While the title card plays, the small header waits (no duplicated name).
 	var alpha: float = area_fade * (1.0 - _card_alpha())
+	# Discreet backing so the header and objective read over detailed floors.
+	_band(Vector2(192, 18), 116.0, 15.0, 0.95)
 	var width: float = _centered(title_font, 192, 12, area, 9, Color(PARCHMENT, alpha))
 	_ornament(192, 8.5, width * 0.5 + 6.0, 12.0, alpha)
 	var line: String = ""
@@ -318,7 +358,7 @@ func _draw_area() -> void:
 	elif game.has_method("objective"):
 		line = game.objective()
 	if line == "": return
-	_centered(body_font, 192, 23, line, 7, Color(CYAN.lerp(PARCHMENT, 0.25), 0.95))
+	_centered(label_font, 192, 23, line, 7, Color(CYAN.lerp(PARCHMENT, 0.3), 1.0))
 	if fighting:
 		for i in range(int(game.wave_total())):
 			var done: bool = i < int(game.wave)
@@ -330,7 +370,7 @@ func _draw_minimap(p: Node) -> void:
 	var frame: PackedVector2Array = PackedVector2Array([
 		r.position + Vector2(cut, 0), Vector2(r.end.x - cut, r.position.y), Vector2(r.end.x, r.position.y + cut), Vector2(r.end.x, r.end.y - cut),
 		Vector2(r.end.x - cut, r.end.y), Vector2(r.position.x + cut, r.end.y), Vector2(r.position.x, r.end.y - cut), r.position + Vector2(0, cut)])
-	draw_colored_polygon(frame, Color(SHADE, 0.8))
+	draw_colored_polygon(frame, Color(SHADE, 0.94))
 	draw_set_transform(MAP_ORIGIN, 0.0, Vector2(0.5, 0.5))
 	draw_texture(map_texture, Vector2.ZERO)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
@@ -352,9 +392,9 @@ func _draw_sockets(p: Node) -> void:
 	# Soft corner backing (fades up and right) so the key labels stay legible on bright floor.
 	var dark: Color = Color(SHADE, 0.6)
 	var clear: Color = Color(SHADE, 0.0)
-	draw_polygon(PackedVector2Array([Vector2(0, 216), Vector2(0, 178), Vector2(64, 216)]), PackedColorArray([dark, clear, clear]))
-	_socket(Vector2(16, 196), 1.0 - clampf(float(p.attack_cooldown) / 0.22, 0.0, 1.0), GOLD, "J", false)
-	_socket(Vector2(38, 196), 1.0 - clampf(float(p.dash_cooldown) / 0.9, 0.0, 1.0), CYAN, "Shift", true)
+	draw_polygon(PackedVector2Array([Vector2(0, 216), Vector2(0, 168), Vector2(78, 216)]), PackedColorArray([dark, clear, clear]))
+	_socket(Vector2(16, 191), 1.0 - clampf(float(p.attack_cooldown) / 0.22, 0.0, 1.0), GOLD, "J", false)
+	_socket(Vector2(40, 191), 1.0 - clampf(float(p.dash_cooldown) / 0.9, 0.0, 1.0), CYAN, "Shift", true)
 
 func _socket(center: Vector2, ready: float, ink: Color, key: String, dash: bool) -> void:
 	var radius: float = 9.0
@@ -364,6 +404,9 @@ func _socket(center: Vector2, ready: float, ink: Color, key: String, dash: bool)
 		var level: float = center.y + radius - 2.0 * radius * ready
 		var clip: PackedVector2Array = PackedVector2Array([Vector2(center.x - radius, level), Vector2(center.x + radius, level), center + Vector2(radius, radius), center + Vector2(-radius, radius)])
 		for piece in Geometry2D.intersect_polygons(shape, clip): draw_colored_polygon(piece, Color(ink, 0.22))
+		# Bright charge line at the fill level: the recharge reads at a glance.
+		var reach: float = radius - absf(level - center.y)
+		if reach > 0.5: draw_line(Vector2(center.x - reach + 0.5, level), Vector2(center.x + reach - 0.5, level), Color(ink, 0.85), 1.0)
 	else:
 		_diamond(center, radius - 2.0, Color(ink, 0.08 + sin(time * 3.0) * 0.04))
 	var bright: Color = ink if ready >= 1.0 else Color(ink, 0.45)
@@ -378,7 +421,9 @@ func _socket(center: Vector2, ready: float, ink: Color, key: String, dash: bool)
 		draw_line(center + Vector2(-3.5, 3.5), center + Vector2(3.5, -3.5), Color(PARCHMENT, bright.a), 1.0)
 		draw_line(center + Vector2(-3.5, 0.5), center + Vector2(-0.5, 3.5), Color(GOLD, bright.a), 1.0)
 		draw_rect(Rect2(center + Vector2(-5, 4), Vector2(1, 1)), Color(GOLD, bright.a))
-	_centered(body_font, center.x, center.y + radius + 7.5, key, 6, Color(PARCHMENT, 0.75))
+	# Key as a keycap (same style as the onboarding hints), dimmed while recharging.
+	var cap: float = maxf(9.0, _text_width(label_font, key, 6) + 5.0)
+	_keycap(Vector2(roundf(center.x - cap * 0.5), center.y + radius + 2.0), key, Color(ink.lerp(PARCHMENT, 0.35), 1.0 if ready >= 1.0 else 0.55), 6)
 
 func _draw_prompt() -> void:
 	if game.game_finished: return
@@ -402,7 +447,7 @@ func _draw_prompt() -> void:
 	var hint_alpha: float = clampf((HINT_SECONDS - time) / 2.0, 0.0, 1.0) * clampf(time - 0.5, 0.0, 1.0)
 	if game.combat_started or hint_alpha <= 0.0: return
 	var total: float = 0.0
-	for hint in HINTS: total += maxf(9.0, _text_width(body_font, hint[0], 6) + 5.0) + _text_width(body_font, hint[1], 6) + 12.0
+	for hint in HINTS: total += maxf(9.0, _text_width(label_font, hint[0], 6) + 5.0) + _text_width(body_font, hint[1], 6) + 12.0
 	var cursor: float = 192.0 - total * 0.5
 	_band(Vector2(192, 203), total * 0.5 + 20.0, 8.0, hint_alpha)
 	for hint in HINTS:
@@ -439,7 +484,7 @@ func _draw_card() -> void:
 	_band(Vector2(192, y - 3), 120.0, 16.0, alpha * 0.8)
 	var width: float = _centered(title_font, 192, y, card, 14, Color(PARCHMENT, alpha))
 	_ornament(192, y - 5, width * 0.5 + 8.0, 34.0, alpha)
-	_centered(body_font, 192, y + 11, "CATACUMBAS DO ECLIPSE", 6, Color(CYAN, 0.8 * alpha))
+	_centered(label_font, 192, y + 11, "CATACUMBAS DO ECLIPSE", 6, Color(CYAN, 0.85 * alpha))
 
 func _draw_indicators() -> void:
 	if game.game_finished: return

@@ -164,3 +164,21 @@ Primeira versão visual coesa das Catacumbas isométricas, sem alterar regras de
 - `iso_prototype.gd` expõe `objective()`, `action_prompt()` e `wave_total()` para a HUD.
 - Testes: `tests/iso_smoke_test.gd` com 67 checks; suíte original 47/47; `tests/iso_capture.gd` também captura HUD inicial, prompt e final.
 - Retomada após desligamento inesperado: estado do commit `6a15de8` verificado (importação sem erros, 47/47 e 66/66, capturas revisadas). Ajustes de acabamento na HUD: o cartão de título da área deixa de persistir quando Kael sai da área (aparecia "Fenda Colapsada" já dentro do Ossário), linha "ecos" alinhada à coluna de "corrupção" sem colidir com a moldura, e fundo suave sob os encaixes de ação. Novo check de regressão (67 no total).
+
+## Nitidez e legibilidade da HUD isométrica (24/11/2026)
+
+- Causa do desfoque: textos rasterizados no espaço lógico da HUD (glifos de 6–9 px com antialiasing) e ampliados 4× (`Control.scale` 2× + stretch `viewport` 2×, sem oversampling de fonte nesse modo), com contorno de 2 unidades empastando as letras.
+- Correção em `isometric/iso_hud.gd`: texto desenhado na resolução nativa do viewport (meia escala, dobro do tamanho, pixels inteiros), `SystemFont` sem antialiasing e com hinting (Georgia/Palatino, Tahoma/Verdana e Tahoma negrito para rótulos), contorno de 1 px + sombra dura; fundo discreto atrás de área/objetivo; keycaps J/Shift com linha de carga; minimapa sem xadrez e com fundo opaco. Layout, cores e identidade preservados; escala global, cenário e gameplay intactos.
+- Testes: 47/47 e 67/67; o check do cartão de área agora espera quadros de processo (estava sensível a quadros lentos). `tests/iso_capture.gd` mostra os dois encaixes em recarga no combate.
+
+## Etapa 4: arquitetura, regiões, abismo e iluminação (24/11/2026)
+
+Segunda versão da composição visual das Catacumbas, só visual (layout, colisão, A*, selos, recompensas, câmera, HUD e personagens intactos). Detalhes em `docs/ISOMETRIC_PROTOTYPE.md`.
+
+- Novos módulos: `isometric/iso_region_style.gd` (direção de arte por área, só dados), `isometric/iso_architecture.gd` (regras determinísticas de variantes de parede), `isometric/iso_abyss.gd` (plataforma de rocha e terraços do abismo), `isometric/iso_lighting.gd` (luz ambiente, arquitetônica e de interesse, poças de luz). `iso_world.gd` delega a eles; `THEMES`, regras de parede, luzes e cintilação saíram de lá.
+- Arte (`tools/build_iso_art.gd`, reprodutível; assets antigos idênticos pixel a pixel): paredes deslocadas, queimadas, relevo do Eclipse, lóculos, infiltração e inscrição lunar; paredes baixas queimada/deslocada; tocos de arco arruinado; estratos do abismo.
+- Regiões com identidade própria (assinatura de parede, piso ordenado ou desgastado, luz de humor, velas, névoa); arco desabado nas Cinzas; coroa do Eclipse na Câmara; fendas irregulares com brilho por área.
+- Abismo: o chão escuro com grade além das salas virou terraços que descem um nível por vez, com estratos, névoa azul-violeta, silhuetas de colunas e luzes distantes; pré-renderizado num `SubViewport`.
+- Luz: cintilação por ruído suave (sem a componente rápida), luzes de interesse com pulso lento e poças pontilhadas na cor da assinatura.
+- Desempenho: 2,4 → 2,7 ms por quadro, 411 → 461 draw calls (a versão direta do abismo custava 12,3 ms e foi substituída pela pré-renderizada).
+- Testes: `tests/iso_smoke_test.gd` com 72 checks (abismo afastado dos pisos e graduado, assinatura por área, arco arruinado e entrada intacta, níveis de luz e cintilação suave, grade de navegação idêntica ao layout); suíte original 47/47. `tests/iso_capture.gd` gera vistas sem HUD por região (`env_*`, `wide_*`).

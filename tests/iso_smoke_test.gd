@@ -179,12 +179,52 @@ func _run() -> void:
 	_check(game.hud.get_script().resource_path.ends_with("iso_hud.gd") and game.hud.revealed.size() > 20, "Isometric HUD with a minimap revealed by exploration (%d cells)" % game.hud.revealed.size())
 	_check((game.objective() != "") != (game.combat_started and not game.room_cleared) and game.action_prompt().is_empty(), "Objective line (waves replace it in combat); no prompt away from chest/exit")
 	game.hud.visited.erase("Fenda Colapsada")
+	# The HUD updates in _process: wait for idle frames (a slow frame can run several
+	# physics steps back to back without any _process in between).
 	_place(Vector2i(45, 40))
-	await _frames(3)
+	for i in range(3): await process_frame
 	var fenda_card: bool = game.hud.card == "Fenda Colapsada"
 	_place(Vector2i(35, 39))
-	await _frames(3)
+	for i in range(3): await process_frame
 	_check(fenda_card and game.hud.card != "Fenda Colapsada", "Area title card is dropped when Kael leaves that area")
+	# --- stage 4: architecture, regions, abyss, lighting ------------------------
+	var abyss_ok: bool = world.abyss.steps.size() > 200
+	var graded: bool = true
+	for cell: Vector2i in world.abyss.steps:
+		for dy in range(-2, 3):
+			for dx in range(-2, 3):
+				if world.is_floor(cell + Vector2i(dx, dy)): abyss_ok = false
+		for offset: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+			if world.abyss.steps.has(cell + offset) and absi(int(world.abyss.steps[cell]) - int(world.abyss.steps[cell + offset])) > 1: graded = false
+	_check(abyss_ok and graded, "Abyss terraces (%d cells) keep a rock shelf around every hall and step down one terrace at a time" % world.abyss.steps.size())
+	var signatures: Dictionary = {"Vestíbulo dos Esquecidos": [24, 25], "Passagem das Cinzas": [18], "Câmara do Eclipse": [19, 20], "Ossário Lunar": [21, 22], "Ruínas Submersas": [23]}
+	var found: Dictionary = {}
+	for child in world.depth.get_children():
+		if not (child is Sprite2D and child.has_meta("wall_row") and child.texture.resource_path.ends_with("wall_full.png")): continue
+		var bits: PackedStringArray = String(child.name).split("_")
+		var wall_at: Vector2i = Vector2i(int(bits[1]), int(bits[2]))
+		for offset: Vector2i in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(1, 1)]:
+			var area_name: String = world.room_name(IsoMath.cell_center(wall_at + offset))
+			if signatures.has(area_name) and signatures[area_name].has(int(child.get_meta("wall_row"))): found[area_name] = true
+	_check(found.size() == signatures.size(), "Each area shows its architectural signature (%s)" % ", ".join(PackedStringArray(found.keys())))
+	var stubs: int = 0
+	for arch in world.arches:
+		if arch.texture.resource_path.contains("stub"): stubs += 1
+	_check(stubs >= 2 and world.occluders[Vector2i(15, 8)][0].texture.resource_path.ends_with("_key.png"), "Ruined arch in the ash corridor (%d stubs); the entrance gate stays intact" % stubs)
+	var torch: PointLight2D = world.lights.flickering[0]
+	var base_energy: float = float(torch.get_meta("base"))
+	var swing: float = 0.0
+	for i in range(30):
+		await process_frame
+		swing = maxf(swing, absf(torch.energy - base_energy) / base_energy)
+	_check(world.lights.flickering.size() >= 10 and world.lights.pulsing.size() >= 6 and world.light_pools.get_child_count() >= 15 and swing <= 0.1, "Light tiers: %d architectural, %d interest, %d floor pools; gentle flicker (max %.0f%%)" % [world.lights.flickering.size(), world.lights.pulsing.size(), world.light_pools.get_child_count(), swing * 100.0])
+	var navigation_same: bool = true
+	for y in range(Layout.size().y):
+		for x in range(Layout.size().x):
+			var probe: Vector2i = Vector2i(x, y)
+			if Layout.SEALS.any(func(seal: Array) -> bool: return seal.has(probe)): continue
+			if world.navigation.is_point_solid(probe) != not world.is_walkable(probe): navigation_same = false
+	_check(navigation_same, "Navigation grid still matches the layout exactly (scenery is visual only)")
 	_check(world.rock.get_used_cells().size() > 300 and world.glow.water_cells.size() >= 15 and world.shafts.size() >= 3, "Rock mass, water pools and moonlight shafts are built")
 
 	# --- elevation -----------------------------------------------------------

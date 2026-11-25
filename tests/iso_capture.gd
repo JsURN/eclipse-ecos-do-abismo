@@ -49,6 +49,7 @@ func _capture() -> void:
 	game.camera.snap_to_target()
 	await create_timer(0.8).timeout
 	game.player.attack()
+	game.player.dash_cooldown = 0.45  # both action sockets mid-recharge in the shot
 	await create_timer(0.08).timeout
 	await RenderingServer.frame_post_draw
 	_save("iso_combat")
@@ -57,8 +58,29 @@ func _capture() -> void:
 	await create_timer(0.2).timeout
 	await RenderingServer.frame_post_draw
 	_save("iso_ending")
+	# Environment-only views (HUD hidden) for before/after comparisons of the scenery:
+	# detail shots at the game's 2x zoom and wide composition shots at 1x.
+	game.game_finished = false
+	game.ending_text = ""
+	for enemy in get_nodes_in_group("enemies"): enemy.queue_free()
+	game.get_node("HUD").visible = false
+	for shot: Array in ENV_SHOTS:
+		game.camera.zoom = Vector2.ONE * float(shot[2])
+		await _shot(shot[0], IsoMath.cell_center(shot[1]))
+	game.camera.zoom = Vector2(2, 2)
 	print("ISO CAPTURE DONE; wall test spot=", hidden_spot)
 	quit()
+
+## [file, cell, zoom]: one detail + one wide view per region, plus abyss edges.
+const ENV_SHOTS: Array = [
+	["env_vestibule", Vector2i(8, 8), 2], ["wide_vestibule", Vector2i(9, 9), 1],
+	["env_ashes", Vector2i(20, 12), 2], ["wide_ashes", Vector2i(19, 12), 1],
+	["env_chamber", Vector2i(37, 19), 2], ["wide_chamber", Vector2i(37, 15), 1],
+	["env_ossuary", Vector2i(35, 38), 2], ["wide_ossuary", Vector2i(35, 38), 1],
+	["env_ruins", Vector2i(53, 30), 2], ["wide_ruins", Vector2i(53, 33), 1],
+	["env_gallery", Vector2i(50, 16), 2], ["env_rift", Vector2i(45, 40), 2],
+	["env_abyss_west", Vector2i(29, 41), 2], ["wide_abyss_south", Vector2i(36, 30), 1],
+]
 
 func _shot(file: String, at: Vector2) -> void:
 	game.player.position = at

@@ -24,7 +24,7 @@ Roteiro do mapa: Vestíbulo dos Esquecidos → Passagem das Cinzas (corredor com
 ```text
 godot --headless --path . --editor --quit
 godot --headless --path . --script tests/smoke_test.gd       # slice original: 47 checks
-godot --headless --path . --script tests/iso_smoke_test.gd   # protótipo: 67 checks
+godot --headless --path . --script tests/iso_smoke_test.gd   # protótipo: 72 checks
 godot --path . --script tests/iso_capture.gd                 # capturas em artifacts/iso_*.png (precisa de GPU)
 ```
 
@@ -70,12 +70,14 @@ Estrado (+6 px) e escadas (+3 px) são **apenas visuais**: o `IsoActorView` apli
 
 ```text
 CatacumbasIsometricas (Node2D)
-├─ FloorDiamonds   TileMapLayer isométrico (piso temático por área + vazio de rocha)
+├─ Abyss           terraços do abismo (iso_abyss.gd), pré-renderizados num SubViewport e exibidos como 1 sprite
+├─ FloorDiamonds   TileMapLayer isométrico (piso temático por área + plataforma de rocha)
 ├─ FloorDetail     decalques espelhados (rachaduras, musgo, poças, ossos, fuligem...)
 ├─ WallShade       oclusão ambiente onde o piso encontra uma parede
 ├─ RockMass        rocha elevada ao redor das salas (y_sort próprio, nunca cobre piso/paredes)
 ├─ RaisedFloor     TileMapLayer isométrico com y_sort próprio (estrado/escadas)
 ├─ FloorGlow       sombras, runas, selos, limiares, mosaico/anéis, fendas, margens da água
+├─ LightPools      poças de luz pontilhadas no piso (iso_lighting.gd), material único
 ├─ Mist            névoa rasteira (iso_atmosphere.gd), abaixo de tudo que é alto
 ├─ DepthSorted     Node2D com y_sort_enabled
 │   ├─ paredes, batentes, arcos, pilares, estátuas, sarcófagos, baú, pedestais, velas
@@ -83,7 +85,7 @@ CatacumbasIsometricas (Node2D)
 │   ├─ KaelView / EnemyView (IsoActorView)
 │   ├─ ProjectileView
 │   └─ SealPane (cortinas dos selos)
-├─ Lights          PointLight2D (tochas, arandelas, velas, runas, altar, baú, saída, humor)
+├─ Lights          iso_lighting.gd: PointLight2D em 3 níveis (ambiente, arquitetônica, interesse)
 └─ Ambient         CanvasModulate
 Atmosphere (irmão do mundo): partículas de altar/pedestais/baú/saída, poeira, vinheta (CanvasLayer 1; HUD na 2)
 ```
@@ -153,6 +155,84 @@ Custo: ~260 partículas de CPU no total, ~60 luzes 2D (a maioria pequenas), spri
 
 Tudo isso é visual: colisão nova só para os novos props bloqueantes (`G`, `F`, `U`, `H`), colocados em cantos e áreas abertas; um teste garante que todo o mapa continua conectado.
 
+## Arquitetura, regiões, abismo e iluminação (etapa 4)
+
+Segunda versão da composição visual. Só visual: layout ASCII, colisão, A*, selos, recompensas, câmera, HUD e personagens intactos (um teste confere que a grade de navegação continua idêntica ao layout).
+
+### Módulos
+
+| Arquivo | Responsabilidade |
+| --- | --- |
+| `iso_region_style.gd` | Direção de arte de cada área, só dados: piso (especiais, decalques, tom, calçamento ordenado), paredes (assinatura, decorações, desgaste, musgo, desabamentos, ritmo de pilastras, parede baixa), luz de humor, orçamento de velas, névoa |
+| `iso_architecture.gd` | Regras determinísticas da variante de cada parede (ver abaixo) |
+| `iso_abyss.gd` | Plataforma de rocha irregular e terraços que descem para o abismo |
+| `iso_lighting.gd` | Três níveis de luz, cintilação suave, poças de luz no piso |
+| `iso_world.gd` | Continua montando tudo e é dono da lógica; delega estilo, variantes, abismo e luz |
+
+### Paredes e arquitetura
+
+Novas linhas nos atlas, acrescentadas ao **fim** (as linhas antigas não mudam; os 24 assets anteriores foram regenerados com 0 pixels de diferença):
+
+- pedras deslocadas (blocos salientes e um bloco caído com encaixe vazio);
+- queimada (fuligem subindo em línguas);
+- relevo do Eclipse (painel rebaixado, anel dourado, disco escuro com borda lunar, raios);
+- lóculos funerários (2×3 nichos, selados ou com crânio);
+- infiltração (manchas úmidas, musgo, limo);
+- inscrição lunar (faixa de glifos gastos).
+
+Paredes baixas ganharam "queimada" e "deslocada". Arcos arruinados usam tocos de lintel presos a cada batente (`lintel_*_stub_*.png`).
+
+Regras (`iso_architecture.gd`), em ordem de prioridade: cantos externos com pedras angulares → desabamentos espaçados nas áreas em ruína → paredes vizinhas a batentes ficam lisas (junções legíveis) → a **assinatura** da área em ritmo regular entre pilastras (parece construído, não salpicado) → decorações da área, espaçadas → pilastras → paredes a até 2 células de água ficam úmidas → desgaste e musgo pelo perfil da área → alvenaria lisa. Tudo por hash da célula: mesma aparência a cada execução.
+
+### Identidade das regiões
+
+| Área | Assinatura | Piso | Luz e props |
+| --- | --- | --- | --- |
+| Vestíbulo dos Esquecidos | inscrições lunares, estandartes, pilastras a cada 4 | calçamento ordenado (xadrez de dois padrões), pouco desgaste | humor azul frio e solene; estátuas e velas; arco de entrada sempre intacto |
+| Passagem das Cinzas | paredes queimadas, rachadas e deslocadas; arco desabado | cinzas e fuligem | humor cinza-violeta baixo; fenda com brasa dourada apagada; sem velas |
+| Câmara do Eclipse | relevos do Eclipse em ritmo, estandartes, pilastras a cada 4 | calçamento ordenado, gravações | coroa do Eclipse gravada ao redor do estrado; altar violeta forte com poça; selos lunares iluminados no centro |
+| Descida do Ossário / Ossário Lunar | lóculos e nichos | ossos, moedas, gravações | humor violeta discreto; até 8 velas votivas com poças; névoa violeta |
+| Fenda Colapsada / Galeria Quebrada | pedras deslocadas, rachaduras, musgo, desabamentos | rachado e musgoso | humor verde-água baixo; fenda violeta |
+| Ruínas Submersas | infiltração e musgo, desabamentos | musgo, poças | humor verde-água, névoa, pedestais com poças cianas |
+
+### Abismo e áreas externas
+
+- Em volta das salas a rocha continua sólida: plataforma de 4–6 células atrás das salas e 3–4 à frente (onde a rocha já é cortada baixa), com borda irregular por célula. A massa elevada vai só até 4 células, emoldurando as paredes.
+- Além dela, **terraços** descem um degrau por vez. O degrau é a distância até a plataforma, então vizinhos nunca diferem mais de um nível: sem paredões abruptos nem salas sobre pilares. Cada borda tem uma face com estratos (`abyss_faces.png`) que escurece para baixo, e cada nível é mais enevoado (perspectiva atmosférica em azul-violeta, não preto).
+- Nos terraços fundos: silhuetas de colunas quebradas (algumas com resto de arco), pontos de luz distantes (ciano, violeta, dourado) e bancos de névoa lenta.
+- Nunca há abismo a menos de 3 células de um piso (teste), e nada disso tem colisão.
+- Custo: desenhado **uma vez** num `SubViewport` (`UPDATE_ONCE`) e exibido como um único sprite, que continua recebendo as luzes 2D e o `CanvasModulate`.
+
+### Iluminação
+
+| Nível | Fontes | Comportamento |
+| --- | --- | --- |
+| Ambiente | `CanvasModulate` (um pouco mais escuro) + uma luz de humor fraca por área | estável |
+| Arquitetônica | braseiros, arandelas, velas | ruído suave de baixa frequência (±9% no máximo; saiu a componente de 11 Hz que piscava); poça de luz no piso à frente |
+| Interesse | altar (violeta), selo de saída, selos lunares e runas (ciano), baú (dourado), pedestais (ciano) | mais fortes, pulso lento, poça na cor da assinatura; o baú aberto se acalma em ciano |
+
+Poças de luz: textura 64×32 com alfa em 4 níveis pontilhado por Bayer, filtro nearest, aditiva, com um único material (um lote só). Fendas do piso: traço em zigue-zague com borda iluminada e brilho na cor da área.
+
+### Desempenho (1536×864, vsync desligado, média de 4 pontos do mapa)
+
+| | Antes (`6a15de8`) | Depois |
+| --- | --- | --- |
+| Tempo de quadro | 2,4 ms (~410 fps) | 2,7 ms (~375 fps) |
+| Draw calls | 411 | 461 |
+| PointLight2D | 47 | 53 |
+
+A primeira versão do abismo, desenhada direto (milhares de primitivas alternando texturas), custava 12,3 ms e 3679 draw calls; a pré-renderização resolveu.
+
+### Regenerar e comparar
+
+```text
+godot --headless --path . --script tools/build_iso_art.gd   # kit de arte (reprodutível)
+godot --headless --path . --editor --quit                   # importa os PNGs
+godot --path . --script tests/iso_capture.gd                # capturas, inclusive env_* e wide_* sem HUD
+```
+
+As capturas `env_*` (zoom 2×) e `wide_*` (zoom 1×) mostram só o cenário, por região. Os pares antes/depois desta etapa ficaram em `artifacts/stage4/before` e `artifacts/stage4/after` (pasta ignorada pelo Git).
+
 ## HUD (`isometric/iso_hud.gd`)
 
 O protótipo isométrico tem HUD própria; `hud.gd` (top-down) não foi alterado nesta etapa. Mesma escala da arte (canvas lógico 384×216 em 2×), sem caixas pesadas: painéis que se dissolvem, filetes de ouro velho e losangos lunares.
@@ -167,7 +247,7 @@ O protótipo isométrico tem HUD própria; `hud.gd` (top-down) não foi alterado
 | Centro | Faixas para ondas/relíquia/selos (título em serifa + subtítulo, cor por tipo), cartão de título ao entrar numa área pela primeira vez (cede lugar às faixas e some ao sair da área), painel de vitória/derrota com tecla R |
 | Bordas | Setas para arqueiros fora da tela; vermelho pulsante nas bordas com vida baixa |
 
-Tipografia: títulos usam fonte serifada do sistema (`SystemFont`: Cinzel, Palatino Linotype, Book Antiqua, Georgia...) com retorno à fonte padrão, sem adicionar arquivos de fonte. O minimapa é desenhado na resolução nativa (meia escala) para ficar nítido.
+Tipografia e nitidez: o jogo renderiza a 768×432 (`stretch/mode="viewport"`, escala inteira 2× até 1536×864) e a HUD é um `Control` com `scale = 2`. Fontes dinâmicas não recebem oversampling nesse modo, então desenhar texto no espaço lógico rasterizava glifos de 6–9 px com antialiasing e os ampliava 4× (borrado). Agora `_text()` desenha sob uma transformação de 0,5 com o dobro do tamanho (`TEXT_OVERSAMPLE`), em pixels inteiros do viewport: cada pixel do glifo vira um bloco 2×2 na tela, como o resto da arte. Fontes `SystemFont` sem antialiasing, com hinting e sem posicionamento subpixel: Georgia/Palatino (títulos, negrito), Tahoma/Verdana (texto) e Tahoma negrito para rótulos pequenos, números, teclas e objetivo. Contorno de 1 px + sombra dura de 1 px no lugar do contorno grosso. Faixa escura discreta atrás da área/objetivo; teclas J/Shift como *keycaps* com linha de carga na recarga; minimapa com 2×2 texels por célula (sem xadrez) e fundo opaco, desenhado na resolução nativa (meia escala).
 
 Ganchos lidos pela HUD em `iso_prototype.gd`: `objective()`, `action_prompt()`, `wave_total()`, `canvas_point()`; a mensagem inicial foi trocada pelo cartão de título da área. `interaction_prompt()` e o mapeamento do minimapa antigo saíram do protótipo (continuam em `main.gd`/`hud.gd` para a slice top-down).
 
@@ -179,9 +259,11 @@ Ganchos lidos pela HUD em `iso_prototype.gd`: `objective()`, `action_prompt()`, 
 - **Elevações bloqueantes**: estrado e escadas são pisáveis por qualquer lado; não há queda nem borda alta.
 - **Oclusão para inimigos**: só Kael aciona a transparência.
 - **TileSet editável**: o TileSet isométrico é montado em código (`IsoWorld.build_tileset()`); ainda não há `.tres` para pintar no editor.
-- **Sombras projetadas por luz**: as luzes 2D não usam `LightOccluder2D`; paredes não bloqueiam luz.
-- **HUD temporária em partes**: retrato reaproveitado do top-down; corrupção é só visual (sistema não implementado); ícones de habilidade desenhados por código; fonte serifada depende do sistema (cai na padrão se ausente).
+- **Sombras projetadas por luz**: as luzes 2D não usam `LightOccluder2D`; paredes não bloqueiam luz (avaliado na etapa 4: exigiria oclusores por célula de parede alinhados à projeção e sombras no renderizador Compatibility; o custo e o risco de artefatos não compensam agora). Profundidade vem de sombras de contato, oclusão na base das paredes, faces claras/escuras no kit e poças de luz.
+- **HUD temporária em partes**: retrato reaproveitado do top-down; corrupção é só visual (sistema não implementado); ícones de habilidade desenhados por código; fontes vêm do sistema (Windows: Georgia/Tahoma; em outros sistemas cai em DejaVu/Liberation ou na fonte padrão, também sem antialiasing); uma fonte bitmap própria daria o mesmo resultado em qualquer plataforma.
 - **Rocha à frente das salas**: cortada em altura baixa por legibilidade; não há "teto" ou transição de câmera para áreas cobertas.
+- **Abismo estático**: os terraços são pré-renderizados ao carregar; luzes distantes e névoa de profundidade não animam individualmente (os bancos de névoa sim). Grandes rochas soltas e estruturas inclinadas nas Ruínas ficaram de fora (exigiriam props com colisão ou arte nova).
+- **Props billboard**: estátua, braseiro, altar, cristal e entulho ainda são sprites frontais do top-down, agora mais contrastados com as paredes novas.
 
 ## Assets: substituídos, temporários e definitivos a produzir
 

@@ -18,6 +18,8 @@ var water_cells: Dictionary = {}
 var inlays: Array[Dictionary] = []
 ## Large fissures (screen polylines) leaking a faint corrupted glow.
 var cracks: Array[PackedVector2Array] = []
+## Glow colour per fissure (same index as `cracks`); violet when missing.
+var crack_tints: Array[Color] = []
 var time: float = 0.0
 const GOLD_INLAY: Color = Color(0.77, 0.65, 0.42, 0.55)
 const WATER_EDGES: Array = [[Vector2i(-1, 0), Vector2(-16, 0), Vector2(0, -8)], [Vector2i(0, -1), Vector2(0, -8), Vector2(16, 0)], [Vector2i(1, 0), Vector2(16, 0), Vector2(0, 8)], [Vector2i(0, 1), Vector2(0, 8), Vector2(-16, 0)]]
@@ -28,12 +30,20 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	for inlay in inlays: _inlay(inlay)
-	for crack in cracks:
+	for c in range(cracks.size()):
+		var crack: PackedVector2Array = cracks[c]
+		var tint: Color = crack_tints[c] if c < crack_tints.size() else Color(0.62, 0.42, 0.82)
+		# Lit lower lip (1 px below), dark gap, then the faint glow seeping from inside.
+		var lip: PackedVector2Array = PackedVector2Array()
+		for point in crack: lip.append(point + Vector2(0, 1))
+		draw_polyline(lip, Color(0.5, 0.56, 0.78, 0.18), 1.0)
 		draw_polyline(crack, Color(0.02, 0.02, 0.05, 0.95), 2.0)
-		draw_polyline(crack, Color(0.62, 0.42, 0.82, 0.22 + sin(time * 1.7) * 0.1), 1.0)
-		for i in range(crack.size() - 1):
+		draw_polyline(crack, Color(tint, 0.26 + sin(time * 1.3 + c) * 0.08), 1.0)
+		for i in range(0, crack.size() - 1, 2):
 			var mid: Vector2 = crack[i].lerp(crack[i + 1], 0.5).round()
-			draw_line(mid, mid + Vector2(5 if i % 2 else -5, 3), Color(0.02, 0.02, 0.05, 0.8), 1.0)
+			var branch: Vector2 = Vector2(4 if (i / 2) % 2 else -4, 2)
+			draw_line(mid, mid + branch, Color(0.02, 0.02, 0.05, 0.8), 1.0)
+			draw_line(mid + branch, mid + branch + Vector2(signf(branch.x) * 2.0, 2), Color(0.02, 0.02, 0.05, 0.55), 1.0)
 	for cell: Vector2i in water_cells:
 		var at: Vector2 = IsoMath.cell_to_screen(cell)
 		for edge in WATER_EDGES:
@@ -73,6 +83,16 @@ func _inlay(inlay: Dictionary) -> void:
 	var center: Vector2 = inlay["center"]
 	var radius: float = float(inlay["radius"])
 	var glint: float = 0.85 + sin(time * 0.9) * 0.15
+	if inlay["kind"] == "corona":
+		# Eclipse corona: 24 engraved rays of alternating length, faint lunar studs.
+		for i in range(24):
+			var direction_c: Vector2 = Vector2.from_angle(TAU * i / 24.0)
+			var inner: float = radius - (10.0 if i % 2 == 0 else 6.0)
+			draw_line(IsoMath.world_to_screen(center + direction_c * inner).round(), IsoMath.world_to_screen(center + direction_c * radius).round(), Color(0.27, 0.3, 0.52, 0.5), 1.0)
+			if i % 3 == 0:
+				var stud_c: Vector2 = IsoMath.world_to_screen(center + direction_c * (radius + 3.0)).round()
+				draw_rect(Rect2(stud_c, Vector2(1, 1)), Color(0.55, 0.5, 0.85, 0.45 * glint))
+		return
 	_iso_ring(center, radius, Color(GOLD_INLAY, GOLD_INLAY.a * glint))
 	_iso_ring(center, radius - 4.0, Color(0.27, 0.34, 0.55, 0.45))
 	for i in range(8):

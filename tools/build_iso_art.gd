@@ -60,8 +60,9 @@ var layouts: Array = [
 
 ## Wall atlas rows (see iso_world.gd WALL_ROWS). Suffix _L / _R = decoration on the
 ## +y (left) or +x (right) face, the one that faces the room.
-const FULL_ROWS: Array[String] = ["plain", "plain", "plain", "cracked", "mossy", "rune_L", "rune_R", "banner_L", "banner_R", "sconce_L", "sconce_R", "niche_L", "niche_R", "pier_L", "pier_R", "quoin", "broken"]
-const LOW_ROWS: Array[String] = ["plain", "plain", "cracked", "mossy", "broken"]
+## Rows 17+ (stage 4) are appended so existing row indices never move.
+const FULL_ROWS: Array[String] = ["plain", "plain", "plain", "cracked", "mossy", "rune_L", "rune_R", "banner_L", "banner_R", "sconce_L", "sconce_R", "niche_L", "niche_R", "pier_L", "pier_R", "quoin", "broken", "displaced", "scorched", "relief_L", "relief_R", "loculi_L", "loculi_R", "seep", "inscription_L", "inscription_R"]
+const LOW_ROWS: Array[String] = ["plain", "plain", "cracked", "mossy", "broken", "scorched", "displaced"]
 const ROCK_HEIGHTS: Array[int] = [0, 12, 20, 28, 40]
 
 func _initialize() -> void:
@@ -92,6 +93,12 @@ func _initialize() -> void:
 		"fallen_column.png": _fallen_column(),
 		"urns.png": _urns(),
 		"bone_pile.png": _bone_pile(),
+		# Stage 4: ruined arch stubs, abyss cliff strata, distant column silhouettes.
+		"lintel_x_stub_a.png": _lintel_stub(true, false),
+		"lintel_x_stub_b.png": _lintel_stub(true, true),
+		"lintel_y_stub_a.png": _lintel_stub(false, false),
+		"lintel_y_stub_b.png": _lintel_stub(false, true),
+		"abyss_faces.png": _abyss_faces(),
 	}
 	var failed: bool = false
 	for file: String in jobs:
@@ -565,7 +572,93 @@ func _wall_decor(kind: String, face: int, s: float, z: float, height: float, see
 				if s >= 10.0 and s < 11.0 and z >= 10.0 and z < 13.0: return BONE
 				if absf(s - 10.5) < 0.6 and z >= 13.0 and z < 14.6: return GOLD_LIGHT
 				return NICHE.lerp(GOLD_DEEP, 0.18) if Vector2(s, z).distance_to(Vector2(10.5, 13.5)) < 3.0 else NICHE
+		# --- stage 4 -----------------------------------------------------------------
+		"displaced":
+			# Settled masonry: a few blocks pushed out (lit top, shadow under), one
+			# fallen out of the course (dark socket with a lit lower lip).
+			var brick: Vector4 = _brick(s, z, height, seed_value * 7 + face * 101)
+			if brick.x < 0.0: return ink
+			var roll: int = _h(int(brick.x), int(brick.y), seed_value * 3 + face + 77) % 9
+			if roll == 0:
+				if brick.z < 1.0 or brick.w < 1.0: return ink
+				if brick.z < 1.8: return _tone(WALL_L if face == LEFT else WALL_R, 0.06)
+				return NICHE if brick.z > 2.6 or brick.w > 2.0 else NICHE.lerp(MORTAR, 0.5)
+			if roll <= 2:
+				if brick.z >= 4.0: return _tone(ink, 0.16)
+				if brick.z < 1.4: return _tone(ink, -0.3)
+				if brick.w < 1.6: return _tone(ink, 0.08)
+				return _tone(ink, 0.04)
+			if roll == 3 and brick.z >= 1.0 and absf(brick.w - 3.5) < 0.5: return CRACK
+		"scorched":
+			# Soot licking up from the floor in tongues; charred bricks; dull embers.
+			var tongue: float = maxf(0.0, sin(s * 0.85 + float(seed_value) * 1.7)) * 0.45
+			var soot: float = clampf(1.15 - z / height + tongue * (z / height) + float(noise % 5) * 0.04 - 0.1, 0.0, 1.0)
+			var charred: Color = ink.lerp(Color("0c0e16"), soot * 0.8)
+			if soot > 0.55 and noise % 17 == 0: return Color("2c2a33")
+			if z < 7.0 and noise % 53 == 0: return GOLD_DEEP
+			return charred
+		"relief":
+			# Carved Eclipse in a sunken panel: gilded ring, dark disc, lunar rim, rays.
+			var center_e: Vector2 = Vector2(8, height * 0.56)
+			var p: Vector2 = Vector2(s, z) - center_e
+			var radius_e: float = p.length()
+			var panel: bool = s > 1.5 and s < 14.5 and z > height * 0.2 and z < height - 6.0
+			if panel and (s < 2.5 or s >= 13.5 or z < height * 0.2 + 1.0 or z >= height - 7.0): return _tone(ink, -0.22)
+			if absf(radius_e - 5.4) < 0.55: return GOLD_DARK if p.x < 0.0 else GOLD_DEEP
+			if radius_e < 3.9:
+				if (p - Vector2(1.1, 0.6)).length() > 3.3: return CYAN if p.x < 0.0 else CYAN_DEEP.lightened(0.2)
+				return PURPLE_DEEP
+			if radius_e > 6.3 and radius_e < 7.6 and fmod(atan2(p.y, p.x) + TAU, PI / 4.0) < 0.22: return GOLD_DEEP
+			if panel: return _tone(ink, -0.08)
+		"loculi":
+			# Funerary wall: two columns of burial slots; some sealed, some holding a skull.
+			for column_l in range(2):
+				for course_l in range(3):
+					var lo_s: float = 2.0 + column_l * 7.0
+					var lo_z: float = 7.0 + course_l * 9.5
+					if s < lo_s - 1.0 or s >= lo_s + 6.0 or z < lo_z - 1.0 or z >= lo_z + 6.0: continue
+					if s < lo_s or z < lo_z: return CAP if z < lo_z else _tone(CAP, -0.12)
+					var kind_l: int = _h(column_l, course_l, seed_value + face * 9) % 3
+					if kind_l == 0:
+						if absf(s - lo_s - 3.0) < 0.6 and absf(z - lo_z - 3.0) < 0.6: return GOLD_DARK
+						return _tone(STONE[2], -0.05) if z > lo_z + 0.8 else _tone(STONE[2], 0.08)
+					var skull_l: Vector2 = Vector2((s - lo_s - 3.0) / 1.6, (z - lo_z - 2.2) / 1.4)
+					if kind_l == 1 and skull_l.length() < 1.0: return NICHE if absf(skull_l.y) < 0.3 and absf(absf(skull_l.x) - 0.45) < 0.25 else BONE
+					return NICHE if z > lo_z + 0.8 else _tone(CAP, 0.04)
+		"seep":
+			# Damp wall: dark wet streaks from the joints, moss at the foot, slime drips.
+			var streak: int = _h(int(s / 3.0), 9, seed_value)
+			if streak % 3 == 0 and z < height - 2.0 and z > height - 8.0 - float(streak % 23):
+				return ink.lerp(Color("0f2a33"), 0.55)
+			if z < 4.0 + float(_h(int(s), 2, seed_value) % 5) and noise % 3 != 0: return MOSS[noise % 3]
+			if streak % 3 == 0 and noise % 11 == 0: return Color("1b4a4c")
+		"inscription":
+			# Band of worn lunar glyphs carved above eye level.
+			var band_z: float = height * 0.62
+			if absf(z - (band_z + 4.0)) < 0.5 or absf(z - (band_z - 4.0)) < 0.5: return _tone(ink, -0.25)
+			if z > band_z - 3.5 and z < band_z + 3.5 and s > 1.0 and s < 15.0:
+				var slot: int = int((s - 1.0) / 3.5)
+				var local: Vector2 = Vector2(fmod(s - 1.0, 3.5) - 1.75, z - band_z)
+				var glyph: int = _h(slot, 4, seed_value + face) % 4
+				var carved: bool = false
+				match glyph:
+					0: carved = _crescent(local.x, local.y, Vector2.ZERO, 1.9)
+					1: carved = absf(local.length() - 1.5) < 0.45
+					2: carved = absf(local.x) < 0.45 and absf(local.y) < 2.2
+					3: carved = absf(local.y - local.x * 1.4) < 0.5 and absf(local.x) < 1.4
+				if carved: return CYAN_DEEP.lightened(0.12) if _h(slot, 5, seed_value) % 3 else CYAN_DEEP.darkened(0.2)
+				return _tone(ink, -0.06)
 	return ink
+
+## Brick under (s, z) for _masonry's layout: (course, brick, height in course, distance
+## from the brick's start). x = -1 outside the coursed band (plinth / capstone).
+func _brick(s: float, z: float, height: float, seed_value: int) -> Vector4:
+	if z < 4.0 or z >= height - 4.0: return Vector4(-1, 0, 0, 0)
+	var row: int = int((z - 4.0) / 5.0)
+	var pattern: int = _h(row, 3, seed_value) % 4
+	var length: float = 16.0 if pattern == 2 else 8.0
+	var offset: float = 4.0 if pattern == 1 or pattern == 3 else 0.0
+	return Vector4(row, int((s + 16.0 - offset) / length), fmod(z - 4.0, 5.0), fmod(s + 16.0 - offset, length))
 
 func _broken_wall(variant: int) -> Image:
 	var image: Image = _blank(32, 48)
@@ -917,4 +1010,58 @@ func _bone_pile() -> Image:
 				if p.length() < 2.4:
 					var eye: bool = (p - Vector2(-0.9, 0.2)).length() < 0.6 or (p - Vector2(0.9, 0.2)).length() < 0.6
 					_ink(image, x, y, NICHE if eye else (BONE.lightened(0.1) if p.y < -0.5 else BONE))
+	return image
+
+# --- stage 4: ruined arches and the abyss -------------------------------------------------
+
+## Half of a broken lintel, still keyed into the post on one side. `far_side` = the
+## stub hangs from the post at the high end of the axis (u or v = 16).
+func _lintel_stub(along_x: bool, far_side: bool) -> Image:
+	var image: Image = _blank(32, 74)
+	var origin: Vector2 = Vector2(16, 58)
+	var reach: float = 8.5
+	var a: float = 16.0 - reach if far_side else 0.0
+	var b: float = 16.0 if far_side else reach
+	var lo: Vector3 = Vector3(a, 4.5, 49) if along_x else Vector3(4.5, a, 49)
+	var hi: Vector3 = Vector3(b, 11.5, 56) if along_x else Vector3(11.5, b, 56)
+	var broken_end: float = a if far_side else b
+	_box(image, origin, lo, hi, func(face: int, u: float, v: float, z: float) -> Color:
+		var along: float = u if along_x else v
+		var from_break: float = absf(along - broken_end)
+		var noise: int = _h(int(u * 2.0), int(v * 2.0) + int(z) * 5, 91)
+		# Jagged fracture: the last two cells of the beam crumble away irregularly.
+		if from_break < 1.6 + sin(z * 1.9 + along) * 1.1 and noise % 3 == 0: return Color.TRANSPARENT
+		if face == TOP: return RIM.darkened(0.2) if noise % 4 == 0 else WALL_TOP.lightened(0.03)
+		var end_face: bool = (face == RIGHT and along_x and not far_side) or (face == LEFT and not along_x and not far_side)
+		if end_face: return Color("2b3150") if noise % 3 else Color("1a1f36")
+		if z < 50.0: return GOLD_DARK if face == LEFT else GOLD_DEEP
+		if from_break < 3.0 and noise % 2 == 0: return CRACK
+		return _tone(WALL_L if face == LEFT else WALL_R, 0.05 + TONES[_h(int(along / 8.0), int(along_x), 21) % TONES.size()]))
+	return image
+
+## Cliff strata for the faces of the abyss terraces (iso_abyss.gd maps these strips on
+## the hanging faces). 4 strips x 16 px: 0-1 lit (+y) face, 2-3 shaded (+x) face; 128 px
+## tall, z grows downward from the terrace lip.
+func _abyss_faces() -> Image:
+	var image: Image = _blank(64, 128)
+	for strip in range(4):
+		var lit: bool = strip < 2
+		var base: Color = Color("222842") if lit else Color("151a30")
+		for z in range(128):
+			for s in range(16):
+				var strata: float = float(z) + sin(s * 0.6 + strip * 2.1) * 1.6 + sin(s * 0.21 + strip) * 2.5
+				var band: int = int(strata / 6.0)
+				var ink: Color = _tone(base, TONES[_h(band, strip, 5) % TONES.size()])
+				if fmod(strata + 60.0, 6.0) < 1.0: ink = _tone(ink, -0.28)
+				# Vertical fissures that run through a few bands.
+				var fissure: int = _h(int(s / 4), band / 3, strip + 11)
+				if fissure % 5 == 0 and s % 4 == 1: ink = Color("090b14")
+				var noise: int = _h(s, z, strip * 7 + 3)
+				if noise % 31 == 0: ink = _tone(ink, 0.1)
+				elif noise % 17 == 0: ink = _tone(ink, -0.1)
+				if z == 0: ink = _tone(base, 0.22)
+				elif z == 1: ink = _tone(base, 0.08)
+				# Falling into darkness: the faces fade well before their bottom.
+				ink = ink.darkened(clampf(float(z) / 96.0, 0.0, 1.0) * 0.75)
+				image.set_pixel(strip * 16 + s, z, ink)
 	return image

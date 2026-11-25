@@ -17,10 +17,20 @@ extends Node2D
 ##                     walls, arches, pillars, props and enemies
 ##      Lights         PointLight2D (sconces, braziers, runes, chest, exit...)
 ## Visual only: nothing below changes collision, navigation or gameplay rules.
+## Collaborators (stage 4), one responsibility each:
+##   iso_region_style.gd   per-area art direction (data)
+##   iso_architecture.gd   wall variant selection rules
+##   iso_abyss.gd          terraces stepping down into the deep rock (drawn first)
+##   iso_lighting.gd       ambient / architectural / interest lights and floor pools
 const IsoMath = preload("res://isometric/iso_math.gd")
 const Layout = preload("res://isometric/catacomb_layout.gd")
 const IsoSeal = preload("res://isometric/iso_seal.gd")
 const FloorGlow = preload("res://isometric/iso_floor_glow.gd")
+const RegionStyle = preload("res://isometric/iso_region_style.gd")
+const Architecture = preload("res://isometric/iso_architecture.gd")
+const Abyss = preload("res://isometric/iso_abyss.gd")
+const Lighting = preload("res://isometric/iso_lighting.gd")
+const Tier = Lighting.Tier
 
 const ART: String = "res://assets/isometric/catacombs/"
 const PROPS_DIR: String = "res://assets/environments/props/"
@@ -45,28 +55,10 @@ const STAIRS: int = 17
 const FLOOR_WATER: Array[int] = [19, 20]
 ## Patch tints (alternative tiles) that break up the repetition of the stone.
 const TINTS: Array[Color] = [Color.WHITE, Color(0.86, 0.87, 0.93), Color(1.1, 1.1, 1.14), Color(0.97, 0.9, 1.07), Color(0.9, 1.0, 1.03)]
-## Wall atlas rows (tools/build_iso_art.gd FULL_ROWS / LOW_ROWS).
-const WALL_ROW: Dictionary = {"plain": 0, "cracked": 3, "mossy": 4, "rune": 5, "banner": 7, "sconce": 9, "niche": 11, "pier": 13, "quoin": 15, "broken": 16}
-const LOW_ROW: Dictionary = {"plain": 0, "cracked": 2, "mossy": 3, "broken": 4}
 const FULL_HEIGHT: int = 56
 const LOW_HEIGHT: int = 28
 enum WallKind { NONE, LOW, FULL, POST }
-
-## Per-area art direction. special: [floor column, % of cells]; decals: [decal column,
-## % of cells]; walls: decorations allowed on back walls facing this area.
-## Decals: 0 cracks, 1 moss, 2 puddle, 3 pebbles, 4 bones, 5 corruption,
-## 6 ritual scratches, 7 soot, 8 dust, 9 coins. Floor: 6 cracked, 7 worn, 8 mossy,
-## 9 engraved, 10 ash.
-const THEMES: Dictionary = {
-	"Vestíbulo dos Esquecidos": {"special": [[7, 10], [6, 3], [9, 3]], "decals": [[8, 8], [0, 3], [4, 2]], "walls": ["banner", "sconce", "rune", "plain"], "tint": 0, "low": "plain"},
-	"Passagem das Cinzas": {"special": [[10, 30], [6, 10]], "decals": [[7, 12], [3, 8], [0, 6]], "walls": ["cracked", "sconce", "plain"], "tint": 0, "low": "cracked", "broken": 12},
-	"Câmara do Eclipse": {"special": [[9, 5], [7, 8], [6, 4]], "decals": [[5, 3], [6, 3], [0, 4], [8, 4]], "walls": ["banner", "rune", "sconce", "banner"], "tint": 0, "low": "plain"},
-	"Descida do Ossário": {"special": [[6, 8], [8, 5]], "decals": [[4, 6], [3, 6]], "walls": ["niche", "sconce"], "tint": 3, "low": "cracked"},
-	"Ossário Lunar": {"special": [[9, 6], [7, 8]], "decals": [[4, 7], [9, 2], [5, 3], [8, 4], [6, 2]], "walls": ["niche", "sconce", "niche", "banner"], "tint": 3, "low": "plain"},
-	"Fenda Colapsada": {"special": [[6, 20], [8, 15]], "decals": [[3, 12], [1, 8], [0, 8]], "walls": ["cracked", "mossy"], "tint": 4, "low": "mossy", "broken": 25},
-	"Galeria Quebrada": {"special": [[6, 15], [8, 15]], "decals": [[1, 10], [3, 8], [0, 6]], "walls": ["cracked", "mossy", "sconce"], "tint": 4, "low": "mossy", "broken": 20},
-	"Ruínas Submersas": {"special": [[8, 25], [6, 12], [7, 8]], "decals": [[1, 8], [2, 8], [0, 6], [3, 5]], "walls": ["mossy", "cracked", "sconce", "rune"], "tint": 4, "low": "mossy", "broken": 18},
-}
+## Area art direction lives in iso_region_style.gd (RegionStyle.THEMES).
 ## Prop table. "block" = isometric sprite whose base diamond sits on the cell (one
 ## variant picked per cell); otherwise a front-facing billboard reused from the
 ## top-down slice. Collision: "radius" (circle) or "box" (square side), world units.
@@ -75,10 +67,10 @@ const PROPS: Dictionary = {
 	"~": {"art": [ART + "wall_broken_a.png", ART + "wall_broken_b.png"], "block": true, "box": 16.0, "occluder": true},
 	"X": {"art": [ART + "sarcophagus.png"], "block": true, "box": 14.0, "shadow": 13.0},
 	"C": {"art": [ART + "chest_closed.png"], "block": true, "box": 14.0, "shadow": 10.0},
-	"Q": {"art": [ART + "pedestal.png"], "block": true, "radius": 6.0, "light": Color("65dddb"), "light_height": 26.0, "shadow": 10.0, "motes": Color("8ff2ea")},
+	"Q": {"art": [ART + "pedestal.png"], "block": true, "radius": 6.0, "light": Color("65dddb"), "light_height": 26.0, "shadow": 10.0, "motes": Color("8ff2ea"), "tier": Tier.INTEREST, "pool": 32.0},
 	"S": {"art": [PROPS_DIR + "statue_sword.png"], "radius": 7.0, "occluder": true, "shadow": 10.0},
-	"T": {"art": [PROPS_DIR + "torch.png"], "radius": 4.0, "light": Color("71cfdf"), "torch": true, "shadow": 5.0},
-	"A": {"art": [PROPS_DIR + "altar.png"], "radius": 7.0, "light": Color("9674d6"), "motes": Color("c7a2e6")},
+	"T": {"art": [PROPS_DIR + "torch.png"], "radius": 4.0, "light": Color("71cfdf"), "torch": true, "shadow": 5.0, "tier": Tier.ARCHITECTURAL, "pool": 64.0},
+	"A": {"art": [PROPS_DIR + "altar.png"], "radius": 7.0, "light": Color("9674d6"), "motes": Color("c7a2e6"), "tier": Tier.INTEREST, "energy": 1.0, "light_scale": 2.8, "pool": 96.0},
 	"c": {"art": [PROPS_DIR + "crystal.png"], "radius": 5.0, "light": Color("9674d6"), "shadow": 6.0},
 	"r": {"art": [PROPS_DIR + "rubble.png"], "radius": 5.0},
 	"B": {"art": [PROPS_DIR + "bones.png"]},
@@ -97,7 +89,11 @@ var rock: TileMapLayer
 var elevation: TileMapLayer
 var glow: FloorGlow
 var depth: Node2D
-var lights: Node2D
+var lights: Lighting
+var abyss: Abyss
+var architecture: Architecture
+## Floor light pools (iso_lighting.gd), between the floor and the depth layer.
+var light_pools: Node2D
 var navigation: AStarGrid2D
 var seals: Array[IsoSeal] = []
 ## Flickering lights (braziers, wall sconces, candles).
@@ -112,6 +108,7 @@ var flames: Array[Dictionary] = []
 var motes: Array[Dictionary] = []
 var mist: Array[Dictionary] = []
 var chest_light: PointLight2D
+var chest_pool: Sprite2D
 var exit_light: PointLight2D
 var camera_bounds: Rect2
 var start_position: Vector2
@@ -139,6 +136,11 @@ func _ready() -> void:
 	chest_position = IsoMath.cell_center(Layout.find("C"))
 	exit_position = IsoMath.cell_center(Layout.find("E"))
 	_compute_camera_bounds()
+	architecture = Architecture.new(self)
+	# The abyss is drawn first: every floor, rock and wall layer covers it.
+	abyss = Abyss.new()
+	abyss.setup(self, _texture(ART + "rock_atlas.png"), _texture(ART + "abyss_faces.png"))
+	add_child(abyss)
 	var tiles: TileSet = build_tileset()
 	ground = _tile_layer("FloorDiamonds", tiles, false)
 	detail = _tile_layer("FloorDetail", tiles, false)
@@ -150,12 +152,15 @@ func _ready() -> void:
 	glow = FloorGlow.new()
 	glow.name = "FloorGlow"
 	add_child(glow)
+	light_pools = Node2D.new()
+	light_pools.name = "LightPools"
+	add_child(light_pools)
 	depth = Node2D.new()
 	depth.name = "DepthSorted"
 	depth.y_sort_enabled = true
 	add_child(depth)
-	lights = Node2D.new()
-	lights.name = "Lights"
+	lights = Lighting.new()
+	lights.setup(_glow_texture(), light_pools)
 	add_child(lights)
 	_paint_floor()
 	_build_walls()
@@ -166,9 +171,10 @@ func _ready() -> void:
 	_build_area_light()
 	var ambient: CanvasModulate = CanvasModulate.new()
 	ambient.name = "Ambient"
-	# Darker than the first prototype so sconces, runes and the relics carry the scene;
-	# Kael keeps his own light (player.gd), so he always stays readable.
-	ambient.color = Color(0.64, 0.66, 0.84)
+	# Ambient tier: dark enough that sconces, runes and relics carry the scene (light
+	# hierarchy), never so dark that floor and walls stop reading. Kael keeps his own
+	# light (player.gd), so he always stays readable.
+	ambient.color = Color(0.6, 0.62, 0.8)
 	add_child(ambient)
 
 # --- queries (same contract as dungeon.gd where applicable) -------------------
@@ -211,6 +217,8 @@ func open_chest() -> void:
 	if chest_light:
 		chest_light.color = Color("65dddb")
 		chest_light.energy = 0.45
+		chest_light.set_meta("still", true)
+	if chest_pool: chest_pool.modulate = Color(Color("65dddb"), 0.1)
 
 func _glow_texture() -> ImageTexture:
 	if glow_texture: return glow_texture
@@ -289,7 +297,7 @@ func _compute_camera_bounds() -> void:
 	camera_bounds = Rect2(bounds.position - Vector2(40, 72), bounds.size + Vector2(80, 104))
 
 func _theme(cell: Vector2i) -> Dictionary:
-	return THEMES.get(room_name(IsoMath.cell_center(cell)), THEMES["Vestíbulo dos Esquecidos"])
+	return RegionStyle.theme(room_name(IsoMath.cell_center(cell)))
 
 static func _pick(table: Array, roll: int) -> int:
 	var total: int = 0
@@ -307,7 +315,7 @@ func _paint_floor() -> void:
 	# the catacomb never reads as a floating island.
 	var margin: int = 30
 	var covered: Rect2 = camera_bounds.grow(32)
-	var distances: Dictionary = _floor_distances(ROCK_REACH + 2)
+	var distances: Dictionary = _floor_distances(ROCK_REACH + Abyss.DEPTHS.size() + 1)
 	for y in range(-margin, size.y + margin):
 		for x in range(-margin, size.x + margin):
 			var cell: Vector2i = Vector2i(x, y)
@@ -333,21 +341,30 @@ func _paint_floor() -> void:
 			if symbol == "R":
 				_put(ground, cell, FLOOR_RUNE, tint)
 				glow.rune_cells.append(cell)
-				_add_light(IsoMath.cell_to_screen(cell), Color("6e96d3"), 0.5, 1.4)
+				lights.add(IsoMath.cell_to_screen(cell), Color("6e96d3"), 0.5, 1.4, Tier.INTEREST)
 			elif symbol == "w":
 				_put(ground, cell, FLOOR_WATER[noise % FLOOR_WATER.size()])
 				glow.water_cells[cell] = true
 			else:
 				var special: int = _pick(theme["special"], noise % 100)
-				_put(ground, cell, special if special >= 0 else FLOOR_PLAIN[(noise / 100) % FLOOR_PLAIN.size()], tint)
+				# Built, cared-for areas are paved on a regular checkerboard of two slab
+				# layouts; the rest uses random flagstones.
+				var plain: int = FLOOR_PLAIN[(noise / 100) % FLOOR_PLAIN.size()]
+				if theme["ordered"]: plain = FLOOR_PLAIN[0] if (x + y) % 2 == 0 else FLOOR_PLAIN[4]
+				_put(ground, cell, special if special >= 0 else plain, tint)
 				var decal: int = _pick(theme["decals"], (noise / 7) % 100)
 				if decal >= 0 and symbol == ".": detail.set_cell(cell, SOURCE_DECAL, Vector2i(decal, 0), (noise / 1000) % 4)
 			var mask: int = 0
 			for bit in range(4):
 				if not is_floor(cell + [Vector2i(-1, 0), Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1)][bit]): mask |= 1 << bit
 			if mask: wall_shade.set_cell(cell, SOURCE_SHADE, Vector2i(mask, 0))
-	exit_light = _add_light(IsoMath.world_to_screen(exit_position) - Vector2(0, 10), Color("79dedc"), 1.15, 2.6)
+	exit_light = lights.add(IsoMath.world_to_screen(exit_position) - Vector2(0, 10), Color("79dedc"), 1.15, 2.6, Tier.INTEREST)
+	lights.add_pool(IsoMath.world_to_screen(exit_position) - Vector2(0, 6), Color("79dedc"), 96.0, 0.22)
 	motes.append({"at": IsoMath.world_to_screen(exit_position) - Vector2(0, 6), "color": Color("9ff5ee"), "amount": 14, "radius": 12.0})
+	# Moon seals on the chamber dais: the ritual centre of the arena.
+	for seal_cell: Vector2i in glow.seal_cells:
+		if Layout.char_at(seal_cell) == "O": lights.add_pool(IsoMath.cell_to_screen(seal_cell) - Vector2(0, 6), Color("9fb8f0"), 48.0, 0.14)
+	abyss.build()
 	_build_floor_features()
 
 ## Chebyshev distance (in cells) from every nearby cell to the closest floor cell.
@@ -372,10 +389,15 @@ func _floor_distances(reach: int) -> Dictionary:
 ## Solid rock around the halls. Raised as a mass near the floor and darkening with
 ## distance, so the edges of the map read as rock fading into shadow, not a void.
 func _paint_rock(cell: Vector2i, distance: int, noise: int) -> void:
+	# Beyond the (irregular) shelf the rock breaks into terraces drawn by iso_abyss.gd.
+	var in_front: bool = distance >= 3 and distance <= ROCK_REACH and _in_front_of_hall(cell)
+	if abyss.classify(cell, distance, noise, ROCK_REACH, in_front): return
 	var shade: int = clampi(distance - 2 + (1 if noise % 5 == 0 else 0), 0, ROCK_SHADES.size() - 1)
 	var variant: int = (noise / 3) % ROCK_VARIANTS
 	ground.set_cell(cell, SOURCE_ROCK, Vector2i(variant, 0), shade)
-	if _wall_kind(cell) != WallKind.NONE or distance > ROCK_REACH: return
+	# Raised mass only close to the halls (it frames the walls); farther out the shelf
+	# stays low and hands over to the abyss terraces instead of ending in dark towers.
+	if _wall_kind(cell) != WallKind.NONE or distance > ROCK_REACH - 3: return
 	var level: int = _rock_level(cell)
 	if level > 0: rock.set_cell(cell, SOURCE_ROCK, Vector2i(level * ROCK_VARIANTS + variant, 0), shade)
 
@@ -405,21 +427,47 @@ func _rock_level(cell: Vector2i) -> int:
 	if level == ROCK_HEIGHTS.size() - 1 and _noise(cell) % 6 == 0: level -= 1
 	return level
 
+## Screen polyline of a fissure: each segment split in three with a small deterministic
+## sideways jitter, so the crack zigzags instead of running in straight strokes.
+func _fissure(path: Array) -> PackedVector2Array:
+	var points: PackedVector2Array = PackedVector2Array()
+	for i in range(path.size() - 1):
+		var a: Vector2 = IsoMath.world_to_screen(Vector2(path[i]) * IsoMath.CELL)
+		var b: Vector2 = IsoMath.world_to_screen(Vector2(path[i + 1]) * IsoMath.CELL)
+		var side: Vector2 = (b - a).orthogonal().normalized()
+		points.append(a.round())
+		for k in range(1, 3):
+			var jitter: float = float(_noise(Vector2i(i * 3 + k, path.size())) % 5) - 2.0
+			points.append((a.lerp(b, k / 3.0) + side * jitter).round())
+	points.append(IsoMath.world_to_screen(Vector2(path[path.size() - 1]) * IsoMath.CELL).round())
+	return points
+
+## True when a hall lies behind `cell` on screen (same probe as _rock_level's cut rule).
+func _in_front_of_hall(cell: Vector2i) -> bool:
+	for rows_up in range(1, 13):
+		for column in range(-2, 3):
+			if (rows_up + column) % 2 != 0: continue
+			if is_floor(cell + Vector2i((column - rows_up) / 2, (-rows_up - column) / 2)): return true
+	return false
+
 ## Points of interest painted on the floor: lunar mosaic, gilded ring around the dais,
 ## glowing fissures, plus the moonlight shafts used by iso_atmosphere.gd.
 func _build_floor_features() -> void:
 	var start_cell: Vector2i = Layout.find("K")
 	glow.inlays.append({"center": IsoMath.cell_center(start_cell), "radius": 30.0, "kind": "mosaic"})
 	glow.inlays.append({"center": Vector2(37, 15) * IsoMath.CELL, "radius": 78.0, "kind": "ring"})
+	# Eclipse corona engraved around the dais: the ritual heart of the arena.
+	glow.inlays.append({"center": Vector2(37, 15) * IsoMath.CELL, "radius": 70.0, "kind": "corona"})
 	glow.inlays.append({"center": Vector2(35.5, 39.5) * IsoMath.CELL, "radius": 40.0, "kind": "ring"})
-	for path in [
-		[Vector2(41.5, 39.3), Vector2(43.5, 40.4), Vector2(46.0, 39.5), Vector2(48.5, 40.5), Vector2(50.5, 39.6)],
-		[Vector2(19.2, 13.6), Vector2(21.5, 12.7), Vector2(23.8, 13.9), Vector2(25.2, 13.2)],
-		[Vector2(38.2, 21.6), Vector2(40.0, 23.0), Vector2(42.6, 22.3), Vector2(44.5, 23.4)],
+	# Fissures: [path in cells, glow colour]. Ash corridor smoulders dull gold; the rift
+	# and the chamber leak corrupted violet.
+	for entry in [
+		[[Vector2(41.5, 39.3), Vector2(43.5, 40.4), Vector2(46.0, 39.5), Vector2(48.5, 40.5), Vector2(50.5, 39.6)], Color(0.62, 0.42, 0.82)],
+		[[Vector2(19.2, 13.6), Vector2(21.5, 12.7), Vector2(23.8, 13.9), Vector2(25.2, 13.2)], Color(0.78, 0.55, 0.3)],
+		[[Vector2(38.2, 21.6), Vector2(40.0, 23.0), Vector2(42.6, 22.3), Vector2(44.5, 23.4)], Color(0.62, 0.42, 0.82)],
 	]:
-		var points: PackedVector2Array = PackedVector2Array()
-		for point: Vector2 in path: points.append(IsoMath.world_to_screen(point * IsoMath.CELL).round())
-		glow.cracks.append(points)
+		glow.cracks.append(_fissure(entry[0]))
+		glow.crack_tints.append(entry[1])
 	for spot: Vector2 in [Vector2(start_cell) + Vector2(0.5, 0.5), Vector2(37, 15), Vector2(35.5, 39.5), Vector2(53.5, 41.5)]:
 		shafts.append(IsoMath.world_to_screen(spot * IsoMath.CELL))
 
@@ -445,8 +493,8 @@ func _build_walls() -> void:
 		for x in range(Layout.size().x):
 			var cell_r: Vector2i = Vector2i(x, y)
 			match _wall_kind(cell_r):
-				WallKind.FULL: rows[cell_r] = _full_wall_row(cell_r)
-				WallKind.LOW: rows[cell_r] = _low_wall_row(cell_r)
+				WallKind.FULL: rows[cell_r] = architecture.full_row(cell_r)
+				WallKind.LOW: rows[cell_r] = architecture.low_row(cell_r)
 	# Pass 2: sprites. Top rims are drawn only on edges that do not continue into the
 	# same kind of intact wall, so runs of walls read as one continuous mass.
 	for y in range(Layout.size().y):
@@ -472,56 +520,24 @@ func _build_walls() -> void:
 			if kind != WallKind.LOW: _register_occluder(cell, sprite)
 			if kind == WallKind.FULL and sconces.has(cell): _add_sconce(cell, sprite)
 
-## Chooses the atlas row of a back wall: decorations face the room they overlook,
-## follow the area theme and are spaced out so they stay special.
-func _full_wall_row(cell: Vector2i) -> int:
-	var noise: int = _noise(cell)
-	var face: int = -1
-	if is_floor(cell + Vector2i(0, 1)): face = 0
-	elif is_floor(cell + Vector2i(1, 0)): face = 1
-	# Outer corner (room on both visible faces): carved corner stones.
-	if is_floor(cell + Vector2i(0, 1)) and is_floor(cell + Vector2i(1, 0)): return WALL_ROW["quoin"]
-	var facing: Vector2i = Vector2i(0, 1) if face == 0 else (Vector2i(1, 0) if face == 1 else Vector2i(1, 1))
-	var theme: Dictionary = _theme(cell + facing)
-	# Collapsed sections break long runs in the ruined areas.
-	if face >= 0 and (noise / 13) % 100 < int(theme.get("broken", 0)) and not _near(broken_cells, cell, 3) and not _near(decorated, cell, 1):
-		broken_cells.append(cell)
-		return WALL_ROW["broken"]
-	if face >= 0 and noise % 100 < 30 and not _near(decorated, cell, 2):
-		var options: Array = theme["walls"]
-		var choice: String = String(options[(noise / 100) % options.size()])
-		if choice == "sconce" and _near(sconces, cell, 6): choice = "plain"
-		if choice != "plain":
-			decorated.append(cell)
-			if choice == "sconce": sconces.append(cell)
-			if choice == "cracked" or choice == "mossy": return WALL_ROW[choice]
-			return int(WALL_ROW[choice]) + face
-	# Pilasters every few cells give long straight walls a rhythm of bays.
-	if (face == 0 and posmod(cell.x, 5) == 2) or (face == 1 and posmod(cell.y, 5) == 2):
-		if not _near(decorated, cell, 0): return int(WALL_ROW["pier"]) + face
-	if theme["walls"].has("mossy") and noise % 5 == 0: return WALL_ROW["mossy"]
-	if theme["walls"].has("cracked") and noise % 6 == 1: return WALL_ROW["cracked"]
-	return (noise / 7) % 3
-
-func _low_wall_row(cell: Vector2i) -> int:
-	var noise: int = _noise(cell)
-	var theme: Dictionary = _theme(cell - Vector2i(1, 1))
-	if int(theme.get("broken", 0)) > 0 and noise % 7 == 0: return LOW_ROW["broken"]
-	var style: String = String(theme["low"])
-	if style != "plain" and noise % 3 == 0: return LOW_ROW[style]
-	return noise % 2
-
+## Variant rules live in iso_architecture.gd; this only tells broken rows apart.
 static func _is_broken(kind: int, row: int) -> bool:
-	return (kind == WallKind.FULL and row == WALL_ROW["broken"]) or (kind == WallKind.LOW and row == LOW_ROW["broken"])
+	if kind != WallKind.FULL and kind != WallKind.LOW: return false
+	return Architecture.is_broken_row(kind == WallKind.FULL, row)
 
-## Wall-mounted lunar flame: light, flicker and embers (iso_atmosphere.gd).
+## Wall-mounted lunar flame: light, flicker, embers (iso_atmosphere.gd) and a pool of
+## light on the floor in front of the wall it hangs on.
 func _add_sconce(cell: Vector2i, wall: Sprite2D) -> void:
 	var on_left: bool = int(wall.get_meta("wall_row")) % 2 == 1
 	var flame: Vector2 = Vector2(-8.0 if on_left else 8.0, -22.0)
-	torches.append(_add_light(wall.position + flame + Vector2(-1.0 if on_left else 1.0, 2.0), Color("71cfdf"), 0.8, 2.0))
+	torches.append(lights.add(wall.position + flame + Vector2(-1.0 if on_left else 1.0, 2.0), Color("71cfdf"), 0.8, 2.0, Tier.ARCHITECTURAL))
+	var front: Vector2i = cell + (Vector2i(0, 1) if on_left else Vector2i(1, 0))
+	lights.add_pool(IsoMath.cell_to_screen(front), Color("71cfdf"), 48.0, 0.1)
 	flames.append({"at": wall.position, "offset": flame, "color": Color("9ff5ee")})
 
-## Stone lintels between every pair of door posts: the passages read as arches.
+## Stone lintels between every pair of door posts: the passages read as arches. In
+## areas that are falling apart (RegionStyle "broken" > 0) the arch has collapsed: only
+## the stubs keyed into each post remain. The entrance gate stays intact.
 func _build_arches() -> void:
 	for y in range(Layout.size().y):
 		for x in range(Layout.size().x):
@@ -531,16 +547,27 @@ func _build_arches() -> void:
 				for span in range(2, 6):
 					var other: Vector2i = post + axis * span
 					if Layout.char_at(other) == "D":
+						var ruined: bool = _ruined_arch(post + axis * (span / 2), axis)
 						for step in range(1, span):
 							var cell: Vector2i = post + axis * step
 							var key: bool = step == span / 2
 							var art: String = "lintel_%s%s.png" % ["x" if axis.x == 1 else "y", "_key" if key else ""]
+							if ruined:
+								if step != 1 and step != span - 1: continue
+								art = "lintel_%s_stub_%s.png" % ["x" if axis.x == 1 else "y", "a" if step == 1 else "b"]
 							var lintel: Sprite2D = _block(cell, ART + art, true)
 							lintel.name = "Arch_%d_%d" % [cell.x, cell.y]
 							_register_occluder(cell, lintel)
 							arches.append(lintel)
 						break
 					if not is_floor(other): break
+
+func _ruined_arch(middle: Vector2i, axis: Vector2i) -> bool:
+	if int(_theme(middle)["broken"]) <= 0: return false
+	var across: Vector2i = Vector2i(axis.y, axis.x)
+	for side: Vector2i in [across, -across]:
+		if room_name(IsoMath.cell_center(middle + side)) == RegionStyle.DEFAULT: return false
+	return true
 
 # --- construction: props -------------------------------------------------------------
 
@@ -571,21 +598,30 @@ func _build_props() -> void:
 			if data.get("occluder", false): _register_occluder(cell, sprite)
 			var light_at: Vector2 = sprite.position - Vector2(0, float(data.get("light_height", 26.0)) + lift)
 			if data.has("light"):
-				var light: PointLight2D = _add_light(light_at, data["light"], 0.8, 2.4)
+				# Braziers are architectural light; altar and pedestals are points of
+				# interest (stronger, slow pulse, floor pool in their signature colour).
+				var tier: int = int(data.get("tier", Tier.AMBIENT))
+				var light: PointLight2D = lights.add(light_at, data["light"], float(data.get("energy", 0.8)), float(data.get("light_scale", 2.4)), tier)
+				if data.has("pool"): lights.add_pool(sprite.position - Vector2(0, lift), data["light"], float(data["pool"]), 0.16 if tier == Tier.INTEREST else 0.11)
 				if data.get("torch", false):
 					torches.append(light)
 					flames.append({"at": sprite.position, "offset": Vector2(0, -27), "color": Color("9ff5ee")})
 			if data.has("motes"): motes.append({"at": light_at, "color": data["motes"], "amount": 8, "radius": 8.0})
-	chest_light = _add_light(IsoMath.world_to_screen(chest_position) - Vector2(0, 12), Color("e0bf7a"), 0.75, 1.8)
+	chest_light = lights.add(IsoMath.world_to_screen(chest_position) - Vector2(0, 12), Color("e0bf7a"), 0.75, 1.8, Tier.INTEREST)
+	chest_pool = lights.add_pool(IsoMath.world_to_screen(chest_position), Color("e0bf7a"), 48.0, 0.18)
 	motes.append({"at": IsoMath.world_to_screen(chest_position) - Vector2(0, 10), "color": Color("e6d29c"), "amount": 6, "radius": 7.0})
 
 ## Small votive candles beside sarcophagi and statues (decor only, walkable).
 func _build_candles() -> void:
-	var placed: int = 0
+	# Budget per area (RegionStyle "candles"): the crypt glows with votives, the
+	# corridors of fire and ruin have none.
+	var placed: Dictionary = {}
 	for y in range(Layout.size().y):
 		for x in range(Layout.size().x):
 			var cell: Vector2i = Vector2i(x, y)
-			if placed >= 10 or Layout.char_at(cell) != "." or _noise(cell) % 3 != 0: continue
+			if Layout.char_at(cell) != "." or _noise(cell) % 3 != 0: continue
+			var area: String = room_name(IsoMath.cell_center(cell))
+			if int(placed.get(area, 0)) >= int(RegionStyle.theme(area)["candles"]): continue
 			var beside: bool = false
 			for offset: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 				if "XS".contains(Layout.char_at(cell + offset)): beside = true
@@ -598,24 +634,26 @@ func _build_candles() -> void:
 			candles.offset = Vector2(-8, -12)
 			candles.position = IsoMath.cell_to_screen(cell) + Vector2(float(noise % 7) - 3.0, float((noise / 7) % 5) - 2.0)
 			depth.add_child(candles)
-			torches.append(_add_light(candles.position - Vector2(0, 6), Color("bfeff0"), 0.35, 0.7))
-			placed += 1
+			torches.append(lights.add(candles.position - Vector2(0, 6), Color("bfeff0"), 0.35, 0.7, Tier.ARCHITECTURAL))
+			lights.add_pool(candles.position, Color("bfeff0"), 16.0, 0.08)
+			placed[area] = int(placed.get(area, 0)) + 1
 
-## Large, faint coloured fills give each area its own mood without hiding anything.
+## Ambient tier: one large, faint coloured fill per area (RegionStyle "mood") gives each
+## area its own temperature without lighting it evenly; ground fog where it is damp;
+## and a few slow banks of haze over the deep terraces of the abyss.
 func _build_area_light() -> void:
-	var moods: Dictionary = {
-		"Câmara do Eclipse": [Color("5b4b9a"), 0.35],
-		"Ossário Lunar": [Color("6a4a8c"), 0.4],
-		"Ruínas Submersas": [Color("2f7d85"), 0.4],
-		"Passagem das Cinzas": [Color("43507a"), 0.25],
-	}
 	for region in Layout.REGIONS:
 		var area: String = String(region["name"])
 		var cells: Rect2i = region["cells"]
+		var style: Dictionary = RegionStyle.theme(area)
 		var center: Vector2 = IsoMath.world_to_screen((Vector2(cells.position) + Vector2(cells.size) * 0.5) * IsoMath.CELL)
-		if moods.has(area): _add_light(center, moods[area][0], moods[area][1], 9.0).name = "Mood_" + area
-		if area == "Ruínas Submersas" or area == "Ossário Lunar" or area == "Fenda Colapsada":
-			mist.append({"at": center, "color": Color("4fb3b0") if area != "Ossário Lunar" else Color("7d5aa6"), "size": Vector2(cells.size) * 6.0})
+		if style["mood"] != null: lights.add(center, style["mood"][0], float(style["mood"][1]), 9.0, Tier.AMBIENT).name = "Mood_" + area
+		if style["mist"] != null: mist.append({"at": center, "color": style["mist"], "size": Vector2(cells.size) * 6.0})
+	var banks: int = 0
+	for cell: Vector2i in abyss.steps:
+		if banks >= 6 or int(abyss.steps[cell]) < 4 or _noise(cell) % 89 != 0: continue
+		mist.append({"at": IsoMath.cell_to_screen(cell) + Vector2(0, abyss.depth(cell)), "color": Color("3a4a86"), "size": Vector2(110, 110)})
+		banks += 1
 
 # --- helpers ------------------------------------------------------------------------
 
@@ -711,16 +749,6 @@ func _add_box(body: StaticBody2D, center: Vector2, size: Vector2) -> void:
 	shape.position = center
 	body.add_child(shape)
 
-func _add_light(at: Vector2, ink: Color, energy: float, radius_scale: float) -> PointLight2D:
-	var light: PointLight2D = PointLight2D.new()
-	light.position = at
-	light.texture = _glow_texture()
-	light.texture_scale = radius_scale
-	light.color = ink
-	light.energy = energy
-	lights.add_child(light)
-	return light
-
 func _touches_floor(cell: Vector2i) -> bool:
 	for dy in range(-1, 2):
 		for dx in range(-1, 2):
@@ -738,11 +766,4 @@ func _put(layer: TileMapLayer, cell: Vector2i, column: int, alternative: int = 0
 static func _noise(cell: Vector2i) -> int:
 	return ((cell.x * 73856093) ^ (cell.y * 19349663)) & 0x7fffffff
 
-func _process(delta: float) -> void:
-	time += delta
-	for i in range(torches.size()):
-		var light: PointLight2D = torches[i]
-		if not light.has_meta("base"): light.set_meta("base", light.energy)
-		light.energy = float(light.get_meta("base")) * (1.0 + sin(time * 4.0 + i * 2.3) * 0.08 + sin(time * 11.0 + i) * 0.03)
-	if chest_light and chest_light.color != Color("65dddb"): chest_light.energy = 0.7 + sin(time * 2.2) * 0.15
-	if exit_light: exit_light.energy = 1.1 + sin(time * 1.6) * 0.12
+## Flicker and pulses are animated by iso_lighting.gd (Lights node).
